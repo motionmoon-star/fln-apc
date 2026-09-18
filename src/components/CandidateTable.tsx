@@ -29,7 +29,9 @@ import {
   Smartphone,
   ChevronDown,
   ChevronUp,
-  Table as TableIcon
+  Table as TableIcon,
+  LayoutGrid,
+  Briefcase
 } from 'lucide-react';
 
 interface CandidateTableProps {
@@ -64,12 +66,12 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
   const [youthFilter, setYouthFilter] = useState<boolean>(false);
   const [degreeFilter, setDegreeFilter] = useState<boolean>(false);
   
-  // Default to phone/card view on mobile screens, customizable
-  const [viewMode, setViewMode] = useState<'phone' | 'table'>(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      return 'phone';
+  // Default to table view on desktop (>= 1024px) for full administrative clarity, and cards on smaller screens
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      return 'table';
     }
-    return 'phone';
+    return 'cards';
   });
 
   // Accordion state to expand the 11 pieces breakdown on phone
@@ -179,28 +181,32 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
               {filteredCandidates.length} {isAr ? 'مترشحين معروضين' : 'candidats affichés'}
             </span>
 
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setViewMode('phone')}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                  viewMode === 'phone' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title={isAr ? 'عرض مخصص للهواتف الذكية (9 محاور إدارية مطابقة للجدول)' : 'Affichage optimisé smartphone (9 axes du tableau)'}
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>{isAr ? 'عرض الهاتف (9 محاور)' : 'Vue Phone (9 axes)'}</span>
-              </button>
+            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
               <button
                 type="button"
                 onClick={() => setViewMode('table')}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                  viewMode === 'table' ? 'bg-emerald-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                 }`}
-                title={isAr ? 'عرض جدول كامل' : 'Grand tableau complet'}
+                title={isAr ? 'عرض الجدول الإداري الكامل (المطابقة، النضال، الرتبة)' : 'Tableau administratif complet'}
               >
                 <TableIcon className="w-3.5 h-3.5" />
-                <span>{isAr ? 'جدول كامل' : 'Tableau'}</span>
+                <span>{isAr ? 'عرض الجدول' : 'Vue Tableau'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'cards'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                }`}
+                title={isAr ? 'عرض بطاقات المترشحين بالتفصيل الإداري' : 'Grille de fiches individuelles'}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>{isAr ? 'عرض البطاقات' : 'Vue Fiches'}</span>
               </button>
             </div>
           </div>
@@ -554,6 +560,18 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
                           <FileText className="w-4 h-4" />
                         </button>
 
+                        {/* Quick Rank */}
+                        <button
+                          onClick={() => {
+                            setQuickRankCandidate(c);
+                            setQuickRankValue(c.listRank ? String(c.listRank) : '');
+                          }}
+                          className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-50 rounded-md transition-colors"
+                          title={isAr ? 'تعيين / تعديل رقم الترتيب' : 'Numéro officiel'}
+                        >
+                          <ShieldCheck className="w-4 h-4 text-amber-600" />
+                        </button>
+
                         {/* Edit Candidate */}
                         <button
                           onClick={() => onEditCandidate(c)}
@@ -584,8 +602,8 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
           </table>
         </div>
       ) : (
-        /* Phone-Optimized Layout ("Mise en page Phone" with 9 administrative axes) */
-        <div className="p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+        /* Executive Cards Grid View ("Vue Fiches Administratives") */
+        <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredCandidates.map(c => {
             const comp = getDossierCompliance(c);
             const age = calculateAge(c.birthDate);
@@ -596,237 +614,220 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
             return (
               <div
                 key={c.id}
-                id={`candidate-phone-card-${c.id}`}
-                className="bg-white rounded-2xl border border-slate-200 hover:border-emerald-500 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
+                id={`candidate-card-${c.id}`}
+                className="bg-white rounded-2xl border border-slate-200 hover:border-emerald-500/70 hover:shadow-md transition-all overflow-hidden flex flex-col justify-between group"
               >
                 <div>
-                  {/* Rubrique Candidat: Mise en page optimisée sans "1. رقم الإدارة (ممنوح)" avec N° à droite */}
-                  <div className="p-3.5 bg-gradient-to-b from-slate-50/90 to-white border-b border-slate-100">
-                    <div className="flex items-start justify-between gap-2.5">
-                      
-                      {/* Photo / Avatar & Names with Number on the right (first in RTL) */}
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        
-                        {/* Numéro officiel du candidat à droite (Right side / Start in RTL) */}
-                        <div className="shrink-0 flex flex-col items-center">
-                          {hasRank ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setQuickRankCandidate(c);
-                                setQuickRankValue(c.listRank ? String(c.listRank) : '');
-                              }}
-                              className={`min-w-[42px] h-[48px] px-2 rounded-xl flex flex-col items-center justify-center font-black shadow-xs transition-transform active:scale-95 cursor-pointer border ${
-                                c.listRank === 1
-                                  ? 'bg-amber-400 text-amber-950 border-amber-500 ring-2 ring-amber-200'
-                                  : 'bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800'
-                              }`}
-                              title={isAr ? 'الرقم الإداري للمترشح - انقر للتعديل' : 'Numéro officiel du candidat - Cliquer pour modifier'}
-                            >
-                              {c.listRank === 1 ? (
-                                <>
-                                  <Crown className="w-3.5 h-3.5 text-amber-950" />
-                                  <span className="text-xs font-black font-mono leading-none">01</span>
-                                  <span className="text-[7.5px] font-bold leading-tight mt-0.5">{isAr ? 'متصدر' : 'Tête'}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-[8px] font-bold text-emerald-200 leading-none">N°</span>
-                                  <span className="text-sm font-black font-mono leading-tight">{String(c.listRank).padStart(2, '0')}</span>
-                                </>
-                              )}
-                            </button>
+                  {/* Top Bar: Council Badge & Official Electoral Rank */}
+                  <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between gap-2">
+                    {/* Conseil Badge */}
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold shadow-2xs ${
+                      c.council === 'APC'
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300/80'
+                        : 'bg-indigo-100 text-indigo-900 border border-indigo-300/80'
+                    }`}>
+                      {c.council === 'APC' ? <Building2 className="w-3.5 h-3.5 text-emerald-700" /> : <Landmark className="w-3.5 h-3.5 text-indigo-700" />}
+                      <span>{c.council === 'APC' ? (isAr ? 'بلدي APC بولوغين' : 'APC Bologhine') : (isAr ? 'ولائي APW الجزائر' : 'APW Alger')}</span>
+                    </span>
+
+                    {/* Official List Rank (Admin Controlled) */}
+                    <div>
+                      {hasRank ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuickRankCandidate(c);
+                            setQuickRankValue(c.listRank ? String(c.listRank) : '');
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black shadow-2xs transition-transform active:scale-95 cursor-pointer border ${
+                            c.listRank === 1
+                              ? 'bg-amber-400 text-amber-950 border-amber-500 ring-2 ring-amber-200'
+                              : 'bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800'
+                          }`}
+                          title={isAr ? 'الترتيب الرسمي للمترشح - انقر للتعديل' : 'Numéro officiel du candidat - Cliquer pour modifier'}
+                        >
+                          {c.listRank === 1 ? (
+                            <>
+                              <Crown className="w-3.5 h-3.5 text-amber-950" />
+                              <span className="font-mono">N° 01</span>
+                              <span className="text-[10px] font-bold">{isAr ? 'متصدر' : 'Tête'}</span>
+                            </>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setQuickRankCandidate(c);
-                                setQuickRankValue('');
-                              }}
-                              className="min-w-[42px] h-[48px] px-2 rounded-xl flex flex-col items-center justify-center font-semibold text-slate-400 hover:text-amber-800 bg-slate-100 hover:bg-amber-50 border border-dashed border-slate-300 hover:border-amber-300 transition-colors cursor-pointer shadow-2xs"
-                              title={isAr ? 'تعيين رقم للمترشح' : 'Attribuer un numéro'}
-                            >
-                              <span className="text-xs font-mono font-bold">--</span>
-                              <span className="text-[8px] font-bold leading-none mt-0.5">{isAr ? '+رقم' : '+N°'}</span>
-                            </button>
+                            <>
+                              <span className="text-[10px] font-semibold text-emerald-200">Rang</span>
+                              <span className="font-mono text-xs">{String(c.listRank).padStart(2, '0')}</span>
+                            </>
                           )}
-                        </div>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuickRankCandidate(c);
+                            setQuickRankValue('');
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-amber-900 bg-white hover:bg-amber-50 border border-dashed border-slate-300 hover:border-amber-400 transition-colors cursor-pointer shadow-2xs"
+                          title={isAr ? 'تعيين رقم رسمي للمترشح' : 'Attribuer un rang officiel'}
+                        >
+                          <Hash className="w-3 h-3 text-slate-400" />
+                          <span>{isAr ? '+ تعيين رقم' : '+ N° Officiel'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                        {/* Photo / Avatar */}
-                        <div className="relative shrink-0 mt-0.5">
-                          {c.photoUrl ? (
-                            <img
-                              src={c.photoUrl}
-                              alt=""
-                              className="w-12 h-12 rounded-full object-cover border-2 border-emerald-600 shadow-xs"
-                            />
-                          ) : (
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm shadow-xs border ${
-                              c.gender === 'F' 
-                                ? 'bg-rose-100 text-rose-800 border-rose-300' 
-                                : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                            }`}>
-                              {c.firstNameFr.charAt(0)}{c.lastNameFr.charAt(0)}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Nom & Prénom et Détails */}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="font-bold text-slate-900 text-base leading-tight font-arabic">
-                              {c.lastNameAr} {c.firstNameAr}
-                            </h4>
+                  {/* Candidate Identity Section */}
+                  <div className="p-4 border-b border-slate-100">
+                    <div className="flex items-start gap-3">
+                      {/* Photo / Avatar */}
+                      <div className="relative shrink-0">
+                        {c.photoUrl ? (
+                          <img
+                            src={c.photoUrl}
+                            alt=""
+                            className={`w-14 h-14 rounded-full object-cover border-2 shadow-xs ${
+                              comp.isComplete 
+                                ? 'border-emerald-600 ring-2 ring-emerald-100' 
+                                : comp.conformeCount >= 8 
+                                ? 'border-amber-500 ring-2 ring-amber-100' 
+                                : 'border-rose-400 ring-2 ring-rose-100'
+                            }`}
+                          />
+                        ) : (
+                          <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-base shadow-xs border-2 ${
+                            c.gender === 'F' 
+                              ? 'bg-rose-100 text-rose-800 border-rose-300' 
+                              : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          }`}>
+                            {c.firstNameFr.charAt(0)}{c.lastNameFr.charAt(0)}
                           </div>
-                          <p className="text-xs text-slate-600 font-semibold uppercase tracking-wide mt-0.5 truncate">
-                            {c.lastNameFr} {c.firstNameFr}
-                          </p>
-
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1 flex-wrap">
-                            <span className="font-medium text-slate-700">{age} {isAr ? 'سنة' : 'ans'}</span>
-                            <span>•</span>
-                            <span className={c.gender === 'F' ? 'text-rose-700 font-semibold' : 'text-slate-600'}>
-                              {c.gender === 'F' ? (isAr ? 'أنثى' : 'Femme') : (isAr ? 'ذكر' : 'Homme')}
-                            </span>
-                            {youth && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded border border-amber-200">
-                                <Sparkles className="w-2.5 h-2.5 text-amber-600" />
-                                <span>{isAr ? 'شاب (< 35)' : 'Jeune'}</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                        )}
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white ${
+                          comp.isComplete ? 'bg-emerald-600' : comp.conformeCount >= 8 ? 'bg-amber-500' : 'bg-rose-500'
+                        }`}>
+                          {comp.isComplete ? '✓' : '!'}
+                        </span>
                       </div>
 
-                      {/* المجلس */}
-                      <div className="shrink-0 text-end">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold shadow-2xs ${
-                          c.council === 'APC'
-                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                            : 'bg-indigo-100 text-indigo-900 border border-indigo-300'
-                        }`}>
-                          {c.council === 'APC' ? <Building2 className="w-3.5 h-3.5" /> : <Landmark className="w-3.5 h-3.5" />}
-                          <span>{c.council === 'APC' ? (isAr ? 'بلدي APC' : 'APC Bologhine') : (isAr ? 'ولائي APW' : 'APW Alger')}</span>
-                        </span>
+                      {/* Names & Demographics */}
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-slate-900 text-base leading-snug font-arabic">
+                          {c.lastNameAr} {c.firstNameAr}
+                        </h4>
+                        <p className="text-xs text-slate-600 font-semibold uppercase tracking-wide mt-0.5 truncate">
+                          {c.lastNameFr} {c.firstNameFr}
+                        </p>
+
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-2 flex-wrap">
+                          <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                            {age} {isAr ? 'سنة' : 'ans'}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-md font-medium text-xs ${
+                            c.gender === 'F' 
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                              : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {c.gender === 'F' ? (isAr ? 'أنثى' : 'Femme') : (isAr ? 'ذكر' : 'Homme')}
+                          </span>
+                          {youth && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">
+                              <Sparkles className="w-3 h-3 text-amber-600" />
+                              <span>{isAr ? 'شاب (< 35)' : 'Jeune (< 35)'}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Section Body: 4. الحي والاتصال, 5. المهنة والمستوى, 6. نضال FLN */}
-                  <div className="p-3.5 space-y-2.5 text-xs divide-y divide-slate-100">
-                    
-                    {/* 4. الحي والاتصال */}
-                    <div className="pt-1 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg shrink-0">
-                          <MapPin className="w-3.5 h-3.5 text-slate-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                            {isAr ? '4. الحي والاتصال (السكن)' : '4. Quartier & Résidence'}
-                          </span>
-                          <span className="font-semibold text-slate-800 truncate block">
-                            {c.addressNeighborhood || 'بولوغين'}
-                          </span>
-                        </div>
+                  {/* Candidate Details: 4. Quartier & Résidence, 5. Profession & Niveau, 6. Militantisme FLN */}
+                  <div className="p-4 space-y-3 text-xs">
+                    {/* 4. Quartier & Résidence */}
+                    <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5">
+                      <div className="text-[10.5px] font-bold text-slate-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-emerald-600" />
+                          <span>{isAr ? '4. الحي والإقامة' : '4. Quartier & Résidence'}</span>
+                        </span>
+                        <span className="font-semibold text-slate-900 text-xs">
+                          {c.addressNeighborhood || 'Bologhine'}
+                        </span>
                       </div>
-
-                      {/* Phone with direct 1-tap call & format */}
-                      <div className="flex items-center gap-2 self-start sm:self-auto bg-emerald-50/90 border border-emerald-300/80 px-2.5 py-1.5 rounded-xl">
-                        <Phone className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                        <div className="min-w-0">
-                          <span className="text-[9px] font-bold text-emerald-800 block uppercase">
-                            {isAr ? 'رقم الهاتف المباشر' : 'Tél direct'}
-                          </span>
-                          <a
-                            href={getCleanTelUrl(c.phoneNumber)}
-                            className="font-bold font-mono text-xs text-emerald-950 hover:text-emerald-700 hover:underline inline-flex items-center gap-1"
-                            title={isAr ? 'انقر للاتصال المباشر من الهاتف' : 'Appeler directement'}
-                          >
-                            <span>{formatPhoneNumber(c.phoneNumber)}</span>
-                          </a>
-                        </div>
+                      <div className="flex items-center justify-between pt-0.5 border-t border-slate-200/60">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">{isAr ? 'الهاتف المباشر' : 'Tél direct'}</span>
+                        <a
+                          href={getCleanTelUrl(c.phoneNumber)}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-100/80 hover:bg-emerald-200 text-emerald-950 border border-emerald-300 font-mono font-bold text-xs transition-colors shrink-0"
+                          title={isAr ? 'انقر للاتصال المباشر' : 'Appel direct'}
+                        >
+                          <Phone className="w-3 h-3 text-emerald-700" />
+                          <span>{formatPhoneNumber(c.phoneNumber)}</span>
+                        </a>
                       </div>
                     </div>
 
-                    {/* 5. المهنة والمستوى */}
-                    <div className="pt-2.5 flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <div className="p-1.5 bg-blue-50 text-blue-700 rounded-lg shrink-0 mt-0.5">
-                          <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                            {isAr ? '5. المهنة والمستوى' : '5. Profession & Niveau'}
+                    {/* 5. Profession & Niveau */}
+                    <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                      <div className="flex items-center gap-1 text-[10.5px] font-bold text-slate-700">
+                        <Briefcase className="w-3 h-3 text-blue-600" />
+                        <span>{isAr ? '5. المهنة والمستوى' : '5. Profession & Niveau'}</span>
+                      </div>
+                      <div className="font-bold text-slate-900 text-xs truncate">
+                        {c.profession}
+                      </div>
+                      <div className="text-[11px] text-slate-600 flex items-center justify-between gap-1 mt-0.5 flex-wrap">
+                        <span className="truncate">{c.educationLevel}</span>
+                        {c.isUniversityGraduate && (
+                          <span className="inline-flex items-center gap-0.5 font-bold text-[10px] text-blue-900 bg-blue-100 px-1.5 py-0.2 rounded border border-blue-200">
+                            <GraduationCap className="w-2.5 h-2.5 text-blue-600" />
+                            <span>{isAr ? 'إطار جامعي (33%)' : 'Diplômé Univ. (Quota 33%)'}</span>
                           </span>
-                          <div className="font-bold text-slate-800 text-xs">
-                            {c.profession}
-                          </div>
-                          <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                            <span>{c.educationLevel}</span>
-                            {c.isUniversityGraduate && (
-                              <span className="inline-flex items-center gap-0.5 font-bold text-[10px] text-blue-800 bg-blue-100/80 px-1.5 py-0.2 rounded border border-blue-200">
-                                {isAr ? 'إطار جامعي (كوتا 33%)' : 'Diplômé Univ. (Quota 33%)'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* 6. نضال FLN */}
-                    <div className="pt-2.5 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg shrink-0">
-                          <BadgeCheck className="w-3.5 h-3.5 text-emerald-700" />
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                            {isAr ? '6. نضال FLN' : '6. Militantisme FLN'}
-                          </span>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold font-mono text-emerald-900 text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                              بطاقة: {c.partyMembershipNumber}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-medium">
-                              {isAr ? `منخرط منذ ${c.partyJoinYear}` : `Adhérent ${c.partyJoinYear}`}
-                            </span>
-                          </div>
-                        </div>
+                    {/* 6. Militantisme FLN */}
+                    <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                      <div className="flex items-center gap-1 text-[10.5px] font-bold text-slate-700">
+                        <BadgeCheck className="w-3 h-3 text-emerald-700" />
+                        <span>{isAr ? '6. نضال FLN' : '6. Militantisme FLN'}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <span className="font-mono font-bold text-emerald-950 text-xs bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-200">
+                          بطاقة: {c.partyMembershipNumber}
+                        </span>
+                        <span className="text-[11px] text-slate-600 font-medium">
+                          {isAr ? `منخرط ${c.partyJoinYear}` : `Adhérent ${c.partyJoinYear}`}
+                        </span>
                       </div>
                     </div>
 
-                    {/* 7. الوثائق الـ 11 (مطابقة إدارية) + 8. حالة الملف */}
-                    <div className="pt-2.5 space-y-2">
+                    {/* 7. Les 11 Pièces (Conformité) */}
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex items-center gap-1.5">
                           <FileText className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                          <span className="text-xs font-bold text-slate-800 truncate">
+                          <span className="text-xs font-bold text-slate-800">
                             {isAr ? '7. الوثائق الـ 11 (مطابقة إدارية)' : '7. Les 11 Pièces (Conformité)'}
                           </span>
                         </div>
 
-                        {/* 8. حالة الملف */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[10px] font-bold text-slate-400 hidden sm:inline uppercase">
-                            {isAr ? '8. حالة الملف:' : '8. Statut :'}
-                          </span>
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
-                            comp.isComplete
-                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                              : comp.conformeCount >= 8
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                              : 'bg-rose-100 text-rose-900 border border-rose-300'
-                          }`}>
-                            {comp.isComplete ? <CheckCircle className="w-3 h-3 text-emerald-600" /> : <Clock className="w-3 h-3 text-amber-600" />}
-                            <span>{comp.conformeCount}/11 ({comp.percentage}%)</span>
-                          </span>
-                        </div>
+                        {/* Status Badge */}
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                          comp.isComplete
+                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                            : comp.conformeCount >= 8
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : 'bg-rose-100 text-rose-900 border border-rose-300'
+                        }`}>
+                          {comp.isComplete ? <CheckCircle className="w-3 h-3 text-emerald-600" /> : <Clock className="w-3 h-3 text-amber-600" />}
+                          <span>{comp.conformeCount}/11 ({comp.percentage}%)</span>
+                        </span>
                       </div>
 
-                      {/* 8. شريط حالة الملف التقدمي */}
+                      {/* Progress Bar */}
                       <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                         <div 
                           className={`h-full transition-all duration-300 ${
@@ -836,7 +837,7 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
                         />
                       </div>
 
-                      {/* 11 document micro-matrix with numbers 1 to 11 */}
+                      {/* 11 Document Micro Indicators */}
                       <div className="grid grid-cols-11 gap-1 py-0.5">
                         {ADMINISTRATIVE_DOCUMENTS.map((docDef, idx) => {
                           const doc = c.documents?.[docDef.key];
@@ -847,9 +848,9 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
                             <div
                               key={docDef.key}
                               title={`${idx + 1}. ${docDef.nameAr} (${docDef.nameFr}): ${
-                                isDocConforme ? 'مطابق' : isDocNonConforme ? 'غير مطابق' : 'قيد الانتظار'
+                                isDocConforme ? 'مطابق / Conforme' : isDocNonConforme ? 'غير مطابق / Non conforme' : 'قيد الانتظار / En attente'
                               }`}
-                              className={`h-6 rounded-md flex items-center justify-center text-[9px] font-bold transition-all shadow-2xs ${
+                              className={`h-5 rounded flex items-center justify-center text-[9px] font-bold transition-all shadow-2xs ${
                                 isDocConforme
                                   ? 'bg-emerald-600 text-white'
                                   : isDocNonConforme
@@ -863,20 +864,20 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
                         })}
                       </div>
 
-                      {/* Expandable detailed 11 docs checklist toggle on mobile */}
+                      {/* Accordion detail button */}
                       <button
                         type="button"
                         onClick={() => setExpandedDocsCandidateId(isDocsExpanded ? null : c.id)}
-                        className="w-full text-center py-1.5 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100/70 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        className="w-full text-center py-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100/70 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <span>
                           {isDocsExpanded 
-                            ? (isAr ? 'إخفاء تفاصيل الـ 11 وثيقة ▲' : 'Masquer le détail des 11 pièces ▲') 
-                            : (isAr ? 'عرض تفاصيل حالة الـ 11 وثيقة بالاسم ▼' : 'Afficher le détail des 11 pièces ▼')}
+                            ? (isAr ? 'إخفاء تفاصيل الوثائق ▲' : 'Masquer le détail des pièces ▲') 
+                            : (isAr ? 'عرض تفاصيل حالة الـ 11 وثيقة ▼' : 'Afficher le détail des 11 pièces ▼')}
                         </span>
                       </button>
 
-                      {/* Expanded 11 Docs List */}
+                      {/* Expanded checklist */}
                       {isDocsExpanded && (
                         <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 animate-in fade-in duration-150">
                           {ADMINISTRATIVE_DOCUMENTS.map((docDef, idx) => {
@@ -910,59 +911,68 @@ export const CandidateTable: React.FC<CandidateTableProps> = ({
                   </div>
                 </div>
 
-                {/* 9. الإجراءات (Actions Bar: Minimum 44px touch targets) */}
-                <div className="p-3 bg-slate-50/90 border-t border-slate-200">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">
-                    {isAr ? '9. الإجراءات الإدارية السريعة:' : '9. Actions administratives :'}
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {/* 1: View / Verify Dossier */}
-                    <button
-                      type="button"
-                      onClick={() => onSelectCandidate(c)}
-                      className="py-2.5 px-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer min-h-[44px]"
-                      title={t.viewDetails}
-                    >
-                      <Eye className="w-4 h-4" />
-                      <span>{isAr ? 'معاينة الملف' : 'Dossier'}</span>
-                    </button>
+                {/* Administrator Action Bar */}
+                <div className="p-3 bg-slate-50/90 border-t border-slate-200 flex items-center justify-between gap-1.5">
+                  {/* View Full Dossier */}
+                  <button
+                    type="button"
+                    onClick={() => onSelectCandidate(c)}
+                    className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer min-h-[38px]"
+                    title={t.viewDetails}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'فحص الملف' : 'Dossier'}</span>
+                  </button>
 
-                    {/* 2: Edit Candidate */}
-                    <button
-                      type="button"
-                      onClick={() => onEditCandidate(c)}
-                      className="py-2.5 px-2 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer min-h-[44px]"
-                      title={t.editCandidate}
-                    >
-                      <Edit3 className="w-4 h-4 text-amber-600" />
-                      <span>{isAr ? 'تعديل' : 'Modifier'}</span>
-                    </button>
+                  {/* Edit */}
+                  <button
+                    type="button"
+                    onClick={() => onEditCandidate(c)}
+                    className="py-2 px-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-semibold text-xs flex items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer min-h-[38px]"
+                    title={t.editCandidate}
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="hidden sm:inline">{isAr ? 'تعديل' : 'Modifier'}</span>
+                  </button>
 
-                    {/* 3: Print Slip */}
-                    <button
-                      type="button"
-                      onClick={() => onPrintDossierSlip(c)}
-                      className="py-2.5 px-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer min-h-[44px]"
-                      title={t.printOfficialSlip}
-                    >
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      <span>{isAr ? 'وصل الإيداع' : 'Bordereau'}</span>
-                    </button>
+                  {/* Print Slip */}
+                  <button
+                    type="button"
+                    onClick={() => onPrintDossierSlip(c)}
+                    className="py-2 px-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-semibold text-xs flex items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer min-h-[38px]"
+                    title={t.printOfficialSlip}
+                  >
+                    <FileText className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="hidden sm:inline">{isAr ? 'وصل' : 'Bordereau'}</span>
+                  </button>
 
-                    {/* 4: Direct Rank Admin Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuickRankCandidate(c);
-                        setQuickRankValue(c.listRank ? String(c.listRank) : '');
-                      }}
-                      className="py-2.5 px-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer min-h-[44px]"
-                      title={isAr ? 'تعيين / تعديل رقم الترتيب الرسمي' : 'Numéro Officiel'}
-                    >
-                      <ShieldCheck className="w-4 h-4 text-amber-700" />
-                      <span>{isAr ? 'الترتيب' : 'Rang'}</span>
-                    </button>
-                  </div>
+                  {/* Official Rank Quick Action */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickRankCandidate(c);
+                      setQuickRankValue(c.listRank ? String(c.listRank) : '');
+                    }}
+                    className="py-2 px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-semibold text-xs flex items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer min-h-[38px]"
+                    title={isAr ? 'تعيين رقم الترتيب الرسمي' : 'Numéro officiel'}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+                    <span className="hidden sm:inline">{isAr ? 'ترتيب' : 'Rang'}</span>
+                  </button>
+
+                  {/* Delete Candidate */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(isAr ? `هل أنت متأكد من حذف المترشح ${c.lastNameFr} ${c.firstNameFr} نهائياً؟` : `Êtes-vous sûr de vouloir supprimer définitivement le candidat ${c.lastNameFr} ${c.firstNameFr} ?`)) {
+                        onDeleteCandidate(c.id);
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-300 transition-all active:scale-95 cursor-pointer min-h-[38px] flex items-center justify-center"
+                    title={t.deleteCandidate}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             );

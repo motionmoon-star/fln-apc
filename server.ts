@@ -101,108 +101,128 @@ Tâche :
       text: promptText,
     });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: contentsPayload,
-      config: {
-        systemInstruction,
-        temperature: 0.1, // Basse température pour une extraction factuelle rigoureuse
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            documentTypeDetected: {
-              type: Type.STRING,
-              description: "Type de document identifié (ex: CNI, Acte de Naissance, Diplôme Universitaire, Casier Judiciaire, Service National, etc.)",
-            },
-            lastNameFr: {
-              type: Type.STRING,
-              description: "Nom de famille en français (ex: BENALI)",
-            },
-            firstNameFr: {
-              type: Type.STRING,
-              description: "Prénom en français (ex: Mohamed)",
-            },
-            lastNameAr: {
-              type: Type.STRING,
-              description: "Nom de famille en arabe (ex: بن علي)",
-            },
-            firstNameAr: {
-              type: Type.STRING,
-              description: "Prénom en arabe (ex: محمد)",
-            },
-            gender: {
-              type: Type.STRING,
-              description: "'H' pour Homme (Masculin / ذكر) ou 'F' pour Femme (Féminin / أنثى)",
-            },
-            birthDate: {
-              type: Type.STRING,
-              description: "Date de naissance au format YYYY-MM-DD",
-            },
-            birthPlace: {
-              type: Type.STRING,
-              description: "Lieu de naissance (ex: Bologhine, Alger, Bab El Oued)",
-            },
-            nationalIdNumber: {
-              type: Type.STRING,
-              description: "Numéro d'Identification National (NIN à 18 chiffres) ou numéro de carte",
-            },
-            addressNeighborhood: {
-              type: Type.STRING,
-              description: "Quartier ou adresse de résidence si mentionnée (ex: Notre Dame d'Afrique, Bologhine)",
-            },
-            phoneNumber: {
-              type: Type.STRING,
-              description: "Numéro de téléphone du candidat si présent (ex: 0550123456)",
-            },
-            email: {
-              type: Type.STRING,
-              description: "Adresse email du candidat si mentionnée",
-            },
-            profession: {
-              type: Type.STRING,
-              description: "Profession ou fonction mentionnée sur le document",
-            },
-            educationLevel: {
-              type: Type.STRING,
-              description: "Niveau d'instruction (Doctorat, Master/Ingénieur, Licence, Technicien, Secondaire)",
-            },
-            isUniversityGraduate: {
-              type: Type.BOOLEAN,
-              description: "Vrai si titulaire d'un diplôme d'études supérieures (Licence, Master, Ingénieur, Doctorat)",
-            },
-            council: {
-              type: Type.STRING,
-              description: "Conseil électoral si mentionné: 'APC' pour APC Bologhine ou 'APW' pour APW Alger",
-            },
-            partyMembershipNumber: {
-              type: Type.STRING,
-              description: "Numéro de carte de militant FLN si carte du parti ou mentionné",
-            },
-            partyJoinYear: {
-              type: Type.INTEGER,
-              description: "Année d'adhésion au FLN (ex: 2018)",
-            },
-            partyRole: {
-              type: Type.STRING,
-              description: "Rôle dans le parti ou kasma FLN",
-            },
-            militaryStatus: {
-              type: Type.STRING,
-              description: "Situation service national: 'accompli', 'dispense', 'exempte', 'sursis', 'non_concerne'",
-            },
-            confidenceNotes: {
-              type: Type.STRING,
-              description: "Remarque sur la clarté de la photo/scan et remarques d'authenticité",
+    let responseText = "{}";
+    const modelsToTry = ["gemini-3.8-flash", "gemini-flash-latest"];
+    let lastError: any = null;
+
+    for (const modelCandidate of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelCandidate,
+          contents: contentsPayload,
+          config: {
+            systemInstruction,
+            temperature: 0.1, // Basse température pour une extraction factuelle rigoureuse
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                documentTypeDetected: {
+                  type: Type.STRING,
+                  description: "Type de document identifié (ex: CNI, Acte de Naissance, Diplôme Universitaire, Casier Judiciaire, Service National, etc.)",
+                },
+                lastNameFr: {
+                  type: Type.STRING,
+                  description: "Nom de famille en français (ex: BENALI)",
+                },
+                firstNameFr: {
+                  type: Type.STRING,
+                  description: "Prénom en français (ex: Mohamed)",
+                },
+                lastNameAr: {
+                  type: Type.STRING,
+                  description: "Nom de famille en arabe (ex: بن علي)",
+                },
+                firstNameAr: {
+                  type: Type.STRING,
+                  description: "Prénom en arabe (ex: محمد)",
+                },
+                gender: {
+                  type: Type.STRING,
+                  description: "'H' pour Homme (Masculin / ذكر) ou 'F' pour Femme (Féminin / أنثى)",
+                },
+                birthDate: {
+                  type: Type.STRING,
+                  description: "Date de naissance au format YYYY-MM-DD",
+                },
+                birthPlace: {
+                  type: Type.STRING,
+                  description: "Lieu de naissance (ex: Bologhine, Alger, Bab El Oued)",
+                },
+                nationalIdNumber: {
+                  type: Type.STRING,
+                  description: "Numéro d'Identification National (NIN à 18 chiffres) ou numéro de carte",
+                },
+                addressNeighborhood: {
+                  type: Type.STRING,
+                  description: "Quartier ou adresse de résidence si mentionnée (ex: Notre Dame d'Afrique, Bologhine)",
+                },
+                phoneNumber: {
+                  type: Type.STRING,
+                  description: "Numéro de téléphone du candidat si présent (ex: 0550123456)",
+                },
+                email: {
+                  type: Type.STRING,
+                  description: "Adresse email du candidat si mentionnée",
+                },
+                profession: {
+                  type: Type.STRING,
+                  description: "Profession ou fonction mentionnée sur le document",
+                },
+                educationLevel: {
+                  type: Type.STRING,
+                  description: "Niveau d'instruction (Doctorat, Master/Ingénieur, Licence, Technicien, Secondaire)",
+                },
+                isUniversityGraduate: {
+                  type: Type.BOOLEAN,
+                  description: "Vrai si titulaire d'un diplôme d'études supérieures (Licence, Master, Ingénieur, Doctorat)",
+                },
+                council: {
+                  type: Type.STRING,
+                  description: "Conseil électoral si mentionné: 'APC' pour APC Bologhine ou 'APW' pour APW Alger",
+                },
+                partyMembershipNumber: {
+                  type: Type.STRING,
+                  description: "Numéro de carte de militant FLN si carte du parti ou mentionné",
+                },
+                partyJoinYear: {
+                  type: Type.INTEGER,
+                  description: "Année d'adhésion au FLN (ex: 2018)",
+                },
+                partyRole: {
+                  type: Type.STRING,
+                  description: "Rôle dans le parti ou kasma FLN",
+                },
+                militaryStatus: {
+                  type: Type.STRING,
+                  description: "Situation service national: 'accompli', 'dispense', 'exempte', 'sursis', 'non_concerne'",
+                },
+                confidenceNotes: {
+                  type: Type.STRING,
+                  description: "Remarque sur la clarté de la photo/scan et remarques d'authenticité",
+                },
+              },
+              required: ["documentTypeDetected"],
             },
           },
-          required: ["documentTypeDetected"],
-        },
-      },
-    });
+        });
 
-    const textOutput = response.text?.trim() || "{}";
-    const parsedData = JSON.parse(textOutput);
+        responseText = response.text?.trim() || "{}";
+        lastError = null;
+        break; // Succès !
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Tentative OCR échouée avec ${modelCandidate}:`, err?.message || err);
+        // Si erreur 503 ou forte demande temporaire, attendre 1.2s avant d'essayer le modèle suivant
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+    }
+
+    if (lastError && responseText === "{}") {
+      throw lastError;
+    }
+
+    const parsedData = JSON.parse(responseText);
 
     return res.json({
       success: true,

@@ -17,7 +17,10 @@ import {
   Users,
   ShieldCheck,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Trash2,
+  Search,
+  UserCheck
 } from 'lucide-react';
 import { Candidate, Language } from '../types';
 import {
@@ -35,6 +38,8 @@ interface DatabaseManagerModalProps {
   candidates: Candidate[];
   onImportCandidates: (newCandidates: Candidate[], mode: 'replace' | 'merge') => void;
   showToast: (message: string) => void;
+  onDeleteCandidate?: (id: string) => void;
+  onDeleteAllExceptHasbaloui?: () => void;
 }
 
 export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
@@ -44,8 +49,11 @@ export const DatabaseManagerModal: React.FC<DatabaseManagerModalProps> = ({
   candidates,
   onImportCandidates,
   showToast,
+  onDeleteCandidate,
+  onDeleteAllExceptHasbaloui,
 }) => {
-  const [activeTab, setActiveTab] = useState<'import' | 'export' | 'github'>('import');
+  const [activeTab, setActiveTab] = useState<'import' | 'export' | 'github' | 'admin_clean'>('import');
+  const [candidateSearch, setCandidateSearch] = useState('');
   const [importMode, setImportMode] = useState<'replace' | 'merge'>('replace');
   const [parsedPreview, setParsedPreview] = useState<Candidate[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -262,6 +270,19 @@ git push -u origin main`;
           >
             <Github className="w-4 h-4 text-slate-900" />
             <span className="text-slate-900 font-black">{isAr ? '3. الرفع إلى GitHub' : '3. Uploader vers GitHub'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('admin_clean')}
+            className={`pb-3 pt-2 px-3 sm:px-4 text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap ${
+              activeTab === 'admin_clean'
+                ? 'border-rose-600 text-rose-800 bg-white rounded-t-xl shadow-2xs'
+                : 'border-transparent text-rose-600 hover:text-rose-800'
+            }`}
+          >
+            <Trash2 className="w-4 h-4 text-rose-600" />
+            <span className="font-bold">{isAr ? '4. إدارة وحذف المترشحين' : '4. Supprimer / Nettoyer (Admin)'}</span>
           </button>
         </div>
 
@@ -701,6 +722,167 @@ git push -u origin main`;
                   <pre className="text-[11px] font-mono text-emerald-400 bg-slate-900/90 p-3 rounded-xl overflow-x-auto select-all leading-relaxed">
                     {gitCliCommands}
                   </pre>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 4: ADMIN SUPPRESSION & NETTOYAGE */}
+          {activeTab === 'admin_clean' && (
+            <div className="space-y-5 animate-in fade-in duration-150">
+              
+              {/* Important Admin Warning Header */}
+              <div className="p-4 bg-rose-50/80 border border-rose-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                    <Trash2 className="w-5 h-5 text-rose-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-rose-950 font-arabic">
+                      {isAr ? 'منطقة المشرف: حذف المترشحين وتنظيف قاعدة البيانات' : 'Espace Administrateur : Suppression & Nettoyage de la Base'}
+                    </h4>
+                    <p className="text-xs text-rose-800/90 font-arabic mt-0.5">
+                      {isAr
+                        ? 'إمكانية حذف مرشحين بشكل فردي، أو الإبقاء حصرياً على المترشح حسبلاوي (مرشح واحد فقط)'
+                        : 'Supprimez des candidats individuellement ou appliquez la réinitialisation exclusive sur Hasbaloui.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Primary Admin Action: Keep only Hasbaloui */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const confirmMsg = isAr
+                      ? 'تأكيد الإدارة: هل أنت متأكد من حذف جميع المترشحين والإبقاء على مترشح واحد فقط (حسبلاوي)؟'
+                      : 'Action Administrateur : Voulez-vous supprimer TOUS les candidats et ne garder que le candidat Hasbaloui (1 seul candidat) ?';
+                    if (window.confirm(confirmMsg)) {
+                      if (onDeleteAllExceptHasbaloui) {
+                        onDeleteAllExceptHasbaloui();
+                      }
+                      onClose();
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isAr ? 'حذف الكل عدا حسبلاوي (1 فقط)' : 'Garder uniquement Hasbaloui'}</span>
+                </button>
+              </div>
+
+              {/* Individual Candidate Management & Search */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h5 className="text-sm font-bold text-slate-900 font-arabic flex items-center gap-2">
+                      <Users className="w-4 h-4 text-slate-700" />
+                      <span>{isAr ? 'قائمة المترشحين المسجلين حالياً' : 'Liste des candidats actuellement enregistrés'}</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 rounded-full text-slate-700 border border-slate-200">
+                        {candidates.length} {isAr ? 'مترشح' : 'candidat(s)'}
+                      </span>
+                    </h5>
+                    <p className="text-xs text-slate-500 font-arabic">
+                      {isAr ? 'اضغط على زر الحذف باللون الأحمر لإزالة المترشح فوراً من السجلات' : 'Cliquez sur le bouton rouge pour supprimer immédiatement un candidat'}
+                    </p>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={candidateSearch}
+                      onChange={(e) => setCandidateSearch(e.target.value)}
+                      placeholder={isAr ? 'بحث بالاسم أو اللقب...' : 'Rechercher par nom...'}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:border-rose-500 focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                {/* Candidate Rows */}
+                <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto rounded-xl border border-slate-100">
+                  {candidates
+                    .filter(c => {
+                      if (!candidateSearch.trim()) return true;
+                      const q = candidateSearch.toLowerCase();
+                      const fullFr = `${c.lastNameFr} ${c.firstNameFr}`.toLowerCase();
+                      const fullAr = `${c.lastNameAr || ''} ${c.firstNameAr || ''}`;
+                      return fullFr.includes(q) || fullAr.includes(q) || (c.nationalIdNumber && c.nationalIdNumber.includes(q));
+                    })
+                    .map((c) => {
+                      const isHasbaloui = (c.lastNameFr || '').toUpperCase().includes('HASBA');
+                      return (
+                        <div
+                          key={c.id}
+                          className="p-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
+                              c.council === 'APC' 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {c.council} {c.listRank ? `#${c.listRank}` : ''}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {c.lastNameFr} {c.firstNameFr}
+                                </span>
+                                {c.lastNameAr && (
+                                  <span className="text-xs text-slate-500 font-arabic truncate">
+                                    {c.lastNameAr} {c.firstNameAr}
+                                  </span>
+                                )}
+                                {isHasbaloui && (
+                                  <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-100 text-amber-900 rounded border border-amber-300">
+                                    {isAr ? 'المترشح الرئيسي' : 'Candidat conservé'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                <span>{c.profession || 'Sans profession renseignée'}</span>
+                                <span>•</span>
+                                <span>{c.addressNeighborhood || 'Bologhine'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const confirmMsg = isAr
+                                  ? `تأكيد الإدارة: هل أنت متأكد من حذف المترشح "${c.lastNameFr} ${c.firstNameFr}" نهائياً من قاعدة البيانات؟`
+                                  : `Action Administrateur : Supprimer définitivement "${c.lastNameFr} ${c.firstNameFr}" de la base de données ?`;
+                                if (window.confirm(confirmMsg)) {
+                                  if (onDeleteCandidate) {
+                                    onDeleteCandidate(c.id);
+                                  }
+                                  showToast(
+                                    isAr
+                                      ? `تم حذف المترشح ${c.lastNameFr} ${c.firstNameFr} بنجاح`
+                                      : `Candidat ${c.lastNameFr} ${c.firstNameFr} supprimé`
+                                  );
+                                }
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 hover:border-rose-300 transition-colors text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                              title={isAr ? 'حذف هذا المترشح (إدارة)' : 'Supprimer ce candidat'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span className="hidden sm:inline">{isAr ? 'حذف' : 'Supprimer'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                  {candidates.length === 0 && (
+                    <div className="p-8 text-center text-xs text-slate-500 font-arabic">
+                      {isAr ? 'لا يوجد أي مترشح في قاعدة البيانات حالياً' : 'Aucun candidat dans la base de données.'}
+                    </div>
+                  )}
                 </div>
               </div>
 

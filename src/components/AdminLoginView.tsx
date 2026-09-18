@@ -35,13 +35,13 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
   const isAr = language === 'ar';
   const [loginMode, setLoginMode] = useState<'admin' | 'candidate'>('admin');
   
-  // Admin form state
-  const [adminUsername, setAdminUsername] = useState('admin');
-  const [adminPassword, setAdminPassword] = useState('admin');
+  // Admin form state (confidential credentials - not prefilled)
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
 
   // Candidate form state
-  const [candidateIdentifier, setCandidateIdentifier] = useState('belkacemi');
-  const [candidatePassword, setCandidatePassword] = useState('candidat123');
+  const [candidateIdentifier, setCandidateIdentifier] = useState('');
+  const [candidatePassword, setCandidatePassword] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -69,8 +69,8 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
 
         setErrorMessage(
           isAr
-            ? (result.error ? 'بيانات الدخول غير صحيحة. استخدم: admin / admin' : 'خطأ في المصادقة')
-            : (result.error || 'Identifiants incorrects. Identifiant par défaut : admin / admin')
+            ? (result.error || 'بيانات الدخول غير صحيحة. يرجى التحقق من اسم المستخدم وكلمة المرور.')
+            : (result.error || 'Identifiants incorrects. Veuillez vérifier votre nom d\'utilisateur et mot de passe.')
         );
       }
     }, 200);
@@ -97,26 +97,11 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
 
         setErrorMessage(
           isAr
-            ? (result.error ? 'لم يتم العثور على ملف المترشح أو كلمة المرور خاطئة. استخدم: belkacemi / candidat123' : 'خطأ في الدخول')
-            : (result.error || 'Dossier introuvable ou mot de passe erroné. Exemple : belkacemi / candidat123')
+            ? (result.error || 'لم يتم العثور على ملف المترشح أو كلمة المرور خاطئة. يرجى التأكد من المعطيات.')
+            : (result.error || 'Dossier introuvable ou mot de passe erroné. Veuillez vérifier vos accès.')
         );
       }
     }, 200);
-  };
-
-  const handleQuickDemoAdmin = (user: string, pass: string) => {
-    setAdminUsername(user);
-    setAdminPassword(pass);
-    setErrorMessage(null);
-    setIsLoading(true);
-
-    setTimeout(() => {
-      const result = loginAdmin(user, pass, true);
-      setIsLoading(false);
-      if (result.success && result.session) {
-        onLoginSuccess(result.session);
-      }
-    }, 150);
   };
 
   return (
@@ -243,39 +228,6 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
           {/* MODE 1: ADMIN LOGIN */}
           {loginMode === 'admin' ? (
             <div className="space-y-4">
-              {/* Quick Preset / Demo Credentials Bar */}
-              <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-700/80 text-xs">
-                <div className="flex items-center justify-between text-slate-300 font-semibold mb-2">
-                  <span className="flex items-center gap-1.5 text-emerald-400">
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>{isAr ? 'بيانات المشرف المعتمدة :' : 'Accès Administrateur Kasma :'}</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
-                    Commission
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-300">
-                  <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
-                    <span className="block text-[10px] text-slate-400 font-sans">{isAr ? 'المستخدم:' : 'User :'}</span>
-                    <strong className="text-white">admin</strong>
-                  </div>
-                  <div className="bg-slate-800/80 p-2 rounded-lg border border-slate-700">
-                    <span className="block text-[10px] text-slate-400 font-sans">{isAr ? 'كلمة المرور:' : 'Password :'}</span>
-                    <strong className="text-emerald-400">admin</strong>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoAdmin('admin', 'admin')}
-                  className="mt-2.5 w-full py-1.5 px-3 bg-emerald-900/70 hover:bg-emerald-800/80 border border-emerald-600/40 text-emerald-200 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{isAr ? 'دخول مباشر وسريع كمسؤول (1-Clic)' : 'Connexion Immédiate (Admin Kasma)'}</span>
-                </button>
-              </div>
-
               {/* Admin Form */}
               <form onSubmit={handleAdminLogin} className="space-y-3.5">
                 <div>
@@ -291,7 +243,7 @@ export const AdminLoginView: React.FC<AdminLoginViewProps> = ({
                       required
                       value={adminUsername}
                       onChange={e => setAdminUsername(e.target.value)}
-                      placeholder="admin"
+                      placeholder={isAr ? 'اسم المستخدم' : 'Nom d\'utilisateur'}
                       className="w-full pl-9 pr-3 py-2 bg-slate-900/90 text-white rounded-xl border border-slate-700 focus:border-emerald-500 text-xs font-medium"
                     />
                   </div>

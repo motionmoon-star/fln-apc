@@ -103,14 +103,6 @@ export default function App() {
     }
   };
 
-  const handleDeleteCandidate = (id: string) => {
-    setCandidates(prev => prev.filter(c => c.id !== id));
-    if (selectedCandidate?.id === id) {
-      setSelectedCandidate(null);
-    }
-    showToast(language === 'ar' ? 'تم حذف المترشح' : 'Candidat supprimé de la liste');
-  };
-
   const handleResetData = () => {
     if (window.confirm(language === 'ar' ? 'هل تريد استعادة البيانات الافتراضية لقسمة بولوغين؟' : 'Réinitialiser toutes les données aux valeurs par défaut de Bologhine ?')) {
       setCandidates(INITIAL_CANDIDATES);
@@ -237,6 +229,52 @@ export default function App() {
         : 'Numérotation et classement officiels enregistrés'
     );
   };
+
+  const handleDeleteCandidate = (candidateId: string) => {
+    const updated = candidates.filter(c => c.id !== candidateId);
+    setCandidates(updated);
+    saveCandidatesToStorage(updated);
+    if (selectedCandidate && selectedCandidate.id === candidateId) {
+      setSelectedCandidate(null);
+    }
+    showToast(
+      language === 'ar'
+        ? 'تم حذف المترشح من القائمة بنجاح'
+        : 'Candidat supprimé de la liste avec succès'
+    );
+  };
+
+  const handleDeleteAllExceptHasbaloui = () => {
+    // Find candidate Hasbaloui
+    const hasbaoui = candidates.find(c => {
+      const lFr = (c.lastNameFr || '').toUpperCase();
+      const fFr = (c.firstNameFr || '').toUpperCase();
+      const lAr = c.lastNameAr || '';
+      return lFr.includes('HASBA') || lFr.includes('HASBAL') || fFr.includes('HASBA') || lAr.includes('حسبلا');
+    });
+
+    const singleCandidate = hasbaoui || INITIAL_CANDIDATES[0];
+    setCandidates([singleCandidate]);
+    saveCandidatesToStorage([singleCandidate]);
+    if (selectedCandidate && selectedCandidate.id !== singleCandidate.id) {
+      setSelectedCandidate(null);
+    }
+    showToast(
+      language === 'ar'
+        ? 'تم حذف جميع المترشحين والإبقاء على المترشh حسبلاوي (مترشح واحد فقط)'
+        : 'Tous les candidats ont été supprimés sauf Hasbaloui (1 seul candidat)'
+    );
+  };
+
+  // Enforce migration to single candidate Hasbaloui if old mock list is loaded
+  useEffect(() => {
+    const hasLegacyMocks = candidates.some(c => 
+      ['BELKACEMI', 'BOUZIDI', 'MEZIANE', 'CHAOUCHE', 'HAMDANI'].includes((c.lastNameFr || '').toUpperCase())
+    );
+    if (hasLegacyMocks || (candidates.length > 1 && !candidates.some(c => (c.lastNameFr || '').toUpperCase().includes('HASBA')))) {
+      handleDeleteAllExceptHasbaloui();
+    }
+  }, []);
 
   const handleAssignRankDirect = (candidateId: string, newRank: number | null) => {
     const updated = candidates.map(c => {
@@ -526,6 +564,7 @@ export default function App() {
           language={language}
           onClose={() => setSelectedCandidate(null)}
           onUpdateCandidate={handleUpdateCandidate}
+          onDeleteCandidate={handleDeleteCandidate}
           onPrintSlip={cand => {
             setSelectedCandidate(null);
             setPrintingDossierCandidate(cand);
@@ -586,6 +625,8 @@ export default function App() {
           currentCouncil={councilFilter === 'ALL' ? 'APC' : councilFilter}
           onClose={() => setIsNumberingManagerOpen(false)}
           onSaveOrder={handleSaveNumbering}
+          onDeleteCandidate={handleDeleteCandidate}
+          onDeleteAllExceptHasbaloui={handleDeleteAllExceptHasbaloui}
         />
       )}
 
@@ -629,6 +670,8 @@ export default function App() {
           candidates={candidates}
           onImportCandidates={handleImportCandidates}
           showToast={showToast}
+          onDeleteCandidate={handleDeleteCandidate}
+          onDeleteAllExceptHasbaloui={handleDeleteAllExceptHasbaloui}
         />
       )}
 

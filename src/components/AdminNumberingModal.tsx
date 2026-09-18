@@ -14,7 +14,8 @@ import {
   CheckCircle2, 
   Hash,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  Trash2
 } from 'lucide-react';
 import { getDossierCompliance } from '../utils/candidateUtils';
 
@@ -24,6 +25,8 @@ interface AdminNumberingModalProps {
   currentCouncil: CouncilType;
   onClose: () => void;
   onSaveOrder: (updatedCandidates: Candidate[]) => void;
+  onDeleteCandidate?: (id: string) => void;
+  onDeleteAllExceptHasbaloui?: () => void;
 }
 
 export const AdminNumberingModal: React.FC<AdminNumberingModalProps> = ({
@@ -32,6 +35,8 @@ export const AdminNumberingModal: React.FC<AdminNumberingModalProps> = ({
   currentCouncil: initialCouncil,
   onClose,
   onSaveOrder,
+  onDeleteCandidate,
+  onDeleteAllExceptHasbaloui,
 }) => {
   const isAr = language === 'ar';
   const [council, setCouncil] = useState<CouncilType>(initialCouncil);
@@ -47,6 +52,55 @@ export const AdminNumberingModal: React.FC<AdminNumberingModalProps> = ({
   });
 
   const councilCandidates = localCandidates.filter(c => c.council === council);
+
+  // Delete a single candidate as Administrator
+  const handleDeleteSingle = (candidateId: string, fullName: string) => {
+    const confirmMsg = isAr
+      ? `إجراء إداري: هل أنت متأكد من حذف المترشح "${fullName}" نهائياً من القائمة؟`
+      : `Action Administrateur : Êtes-vous sûr de vouloir supprimer définitivement le candidat "${fullName}" de la liste ?`;
+    
+    if (window.confirm(confirmMsg)) {
+      setLocalCandidates(prev => {
+        const remaining = prev.filter(c => c.id !== candidateId);
+        // Re-number council candidates cleanly
+        const otherCouncils = remaining.filter(c => c.council !== council);
+        const thisCouncil = remaining.filter(c => c.council === council).map((c, idx) => ({
+          ...c,
+          listRank: c.listRank ? idx + 1 : null,
+        }));
+        return [...otherCouncils, ...thisCouncil];
+      });
+
+      if (onDeleteCandidate) {
+        onDeleteCandidate(candidateId);
+      }
+    }
+  };
+
+  // Delete all except Hasbaloui as Administrator
+  const handleKeepOnlyHasbaloui = () => {
+    const confirmMsg = isAr
+      ? 'إجراء إداري حاسم: هل تريد حذف جميع المترشحين والإبقاء على مترشح واحد فقط (حسبلاوي)؟'
+      : 'Action Administrateur : Supprimer TOUS les candidats de la liste sauf Hasbaloui (1 seul candidat restant) ?';
+
+    if (window.confirm(confirmMsg)) {
+      if (onDeleteAllExceptHasbaloui) {
+        onDeleteAllExceptHasbaloui();
+        onClose();
+      } else {
+        const hasbaoui = localCandidates.find(c => {
+          const lFr = (c.lastNameFr || '').toUpperCase();
+          const fFr = (c.firstNameFr || '').toUpperCase();
+          const lAr = c.lastNameAr || '';
+          return lFr.includes('HASBA') || lFr.includes('HASBAL') || fFr.includes('HASBA') || lAr.includes('حسبلا');
+        });
+        if (hasbaoui) {
+          setLocalCandidates([hasbaoui]);
+          onSaveOrder([hasbaoui]);
+        }
+      }
+    }
+  };
 
   // Set specific rank for a candidate and shift others
   const handleSetRank = (candidateId: string, newRankStr: string) => {
@@ -225,15 +279,25 @@ export const AdminNumberingModal: React.FC<AdminNumberingModalProps> = ({
             </button>
           </div>
 
-          {/* Quick Renumber Button */}
-          <div className="flex items-center gap-2">
+          {/* Quick Admin Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleAutoNumberSequentially}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors"
               title="Renuméroter consécutivement de 1 à N"
             >
               <RotateCcw className="w-3 h-3 text-emerald-700" />
-              <span>{isAr ? 'ترقيم تسلسلي تلقائي (1 إلى N)' : 'Renuméroter séquentiellement (1 à N)'}</span>
+              <span>{isAr ? 'ترقيم تسلسلي (1..N)' : 'Renuméroter (1..N)'}</span>
+            </button>
+
+            {/* Admin Delete Action: Keep only Hasbaloui */}
+            <button
+              onClick={handleKeepOnlyHasbaloui}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 hover:border-rose-300 transition-colors cursor-pointer"
+              title={isAr ? 'حذف كل المترشحين والإبقاء فقط على حسبلاوي (مرشح واحد)' : 'Supprimer tous les candidats sauf Hasbaloui (1 seul candidat)'}
+            >
+              <Trash2 className="w-3 h-3 text-rose-600" />
+              <span>{isAr ? 'حذف الكل عدا حسبلاوي' : 'Garder uniquement Hasbaloui'}</span>
             </button>
           </div>
         </div>
@@ -375,6 +439,16 @@ export const AdminNumberingModal: React.FC<AdminNumberingModalProps> = ({
                         {isAr ? 'إلغاء' : 'Dénuméroter'}
                       </button>
                     )}
+
+                    {/* Delete Candidate (Action Administrateur) */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSingle(c.id, `${c.lastNameFr} ${c.firstNameFr}`)}
+                      className="p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition-colors cursor-pointer"
+                      title={isAr ? 'حذف المترشح من القائمة (إجراء إداري)' : 'Supprimer ce candidat de la liste (Action Administrateur)'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               );

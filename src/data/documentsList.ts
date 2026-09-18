@@ -17,12 +17,12 @@ export interface DocumentDefinition {
 export const ADMINISTRATIVE_DOCUMENTS: DocumentDefinition[] = [
   {
     key: 'birth_certificate',
-    nameFr: 'Extrait de naissance',
-    nameAr: 'شهادة الميلاد (عقد رقم 12)',
-    shortLabelFr: 'Naissance',
-    shortLabelAr: 'الميلاد',
-    descriptionFr: 'Extrait d\'acte de naissance n°12 de l\'officier d\'état civil ou extrait de naissance spécial',
-    descriptionAr: 'شهادة ميلاد أصلية حديثة مستخرجة من سجلات الحالة المدنية',
+    nameFr: 'Fiche familiale & Acte de naissance',
+    nameAr: 'البطاقة العائلية وشهادة الميلاد (عقد 12)',
+    shortLabelFr: 'Fiche fam. / Naiss.',
+    shortLabelAr: 'بطاقة عائلية / ميلاد',
+    descriptionFr: 'Fiche familiale d\'état civil et/ou extrait d\'acte de naissance n°12 original délivré par l\'officier d\'état civil',
+    descriptionAr: 'البطاقة العائلية للحالة المدنية و/أو شهادة الميلاد رقم 12 الأصلية لإثبات الهوية والسن والنسب',
     legalNoticeFr: 'Obligatoire pour prouver l\'identité, l\'âge minimum légal et la filiation',
     legalNoticeAr: 'إلزامية لإثبات الهوية والسن القانوني المشترط والنسب',
     validityFr: 'Validité en cours d\'exercice',

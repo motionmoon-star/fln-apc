@@ -888,101 +888,171 @@ export const CandidatePortalView: React.FC<CandidatePortalViewProps> = ({
                     </div>
                   </div>
 
-                  {/* 3. الحي والاتصال, 4. المهنة والمستوى, 5. نضال FLN */}
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 border-b border-slate-100 text-xs">
+                  {/* 4. Quartier & Résidence, 5. Profession & Niveau, 6. Militantisme FLN */}
+                  <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3.5 border-b border-slate-100 text-xs bg-slate-50/50">
                     
-                    {/* 3. الحي والاتصال */}
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                        <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{isAr ? '3. الحي والاتصال' : '3. Quartier & Contact'}</span>
+                    {/* 4. Quartier & Résidence */}
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-100 pb-1.5">
+                          <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                            <MapPin className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-xs font-bold">{isAr ? '4. الحي والإقامة والاتصال' : '4. Quartier & Résidence'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">{isAr ? 'حي الإقامة ببولوغين:' : 'Quartier & Résidence :'}</span>
+                          <span className="font-bold text-slate-800 text-xs mt-0.5 block">{candidate.addressNeighborhood || 'Bologhine Centre (Ibn Ziri)'}</span>
+                        </div>
+                        {candidate.nationalIdNumber && (
+                          <div>
+                            <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">{isAr ? 'الرقم التعريفي الوطني (NIN):' : 'N° National (NIN) :'}</span>
+                            <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block mt-0.5">
+                              {candidate.nationalIdNumber}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      <div className="pt-1">
-                        <span className="text-slate-500 text-[11px] block">{isAr ? 'الحي:' : 'Quartier :'}</span>
-                        <span className="font-semibold text-slate-800">{candidate.addressNeighborhood || 'بولوغين'}</span>
-                      </div>
-                      <div className="pt-1">
-                        <span className="text-slate-500 text-[11px] block">{isAr ? 'الهاتف المعتمد:' : 'Téléphone :'}</span>
-                        <a
-                          href={getCleanTelUrl(candidate.phoneNumber)}
-                          className="font-mono font-bold text-xs text-emerald-800 hover:text-emerald-950 hover:underline inline-flex items-center gap-1"
-                          title={isAr ? 'انقر للاتصال المباشر' : 'Appeler directement'}
-                        >
-                          <Phone className="w-3 h-3 text-emerald-600" />
-                          <span>{formatPhoneNumber(candidate.phoneNumber)}</span>
-                        </a>
-                      </div>
-                    </div>
 
-                    {/* 4. المهنة والمستوى */}
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                        <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{isAr ? '4. المهنة والمستوى' : '4. Profession & Niveau'}</span>
-                      </div>
-                      <div className="pt-1">
-                        <span className="text-slate-500 text-[11px] block">{isAr ? 'المهنة:' : 'Profession :'}</span>
-                        <span className="font-bold text-slate-800 truncate block">{candidate.profession}</span>
-                      </div>
-                      <div className="pt-1 flex items-center justify-between gap-1 flex-wrap">
-                        <span className="font-medium text-slate-700 text-[11px]">{candidate.educationLevel}</span>
-                        {candidate.isUniversityGraduate && (
-                          <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-1.5 py-0.2 rounded border border-blue-200">
-                            {isAr ? 'إطار جامعي' : 'Univ.'}
-                          </span>
+                      <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                        <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">{isAr ? 'الهاتف المباشر:' : 'Tél direct :'}</span>
+                        {candidate.phoneNumber ? (
+                          <a
+                            href={getCleanTelUrl(candidate.phoneNumber)}
+                            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300 font-mono font-bold text-xs hover:bg-emerald-100 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                            title={isAr ? 'انقر للاتصال المباشر من الهاتف' : 'Appeler directement'}
+                          >
+                            <Phone className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span>{formatPhoneNumber(candidate.phoneNumber)}</span>
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px] block">{isAr ? 'غير مسجل' : 'Non renseigné'}</span>
+                        )}
+
+                        {candidate.email && (
+                          <div className="pt-1">
+                            <a href={`mailto:${candidate.email}`} className="text-blue-700 hover:underline truncate block text-[11px] font-medium">
+                              {candidate.email}
+                            </a>
+                          </div>
                         )}
                       </div>
                     </div>
 
-                    {/* 5. نضال FLN */}
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                        <BadgeCheck className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>{isAr ? '5. نضال FLN' : '5. Militantisme FLN'}</span>
+                    {/* 5. Profession & Niveau */}
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-100 pb-1.5">
+                          <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center shrink-0">
+                            <Briefcase className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-xs font-bold">{isAr ? '5. المهنة والمستوى العلمي' : '5. Profession & Niveau'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">{isAr ? 'المهنة أو الوظيفة:' : 'Profession :'}</span>
+                          <span className="font-bold text-slate-800 block text-xs mt-0.5 leading-snug">{candidate.profession || 'Sans profession'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">{isAr ? 'المستوى والمؤهل الدراسي:' : 'Niveau & Diplôme :'}</span>
+                          <span className="font-medium text-slate-700 text-xs mt-0.5 block">{candidate.educationLevel}</span>
+                        </div>
                       </div>
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-slate-500 text-[11px]">{isAr ? 'رقم البطاقة:' : 'N° Carte :'}</span>
-                        <span className="font-mono font-bold text-emerald-900 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                          {candidate.partyMembershipNumber}
-                        </span>
+
+                      <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                        {candidate.isUniversityGraduate && (
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-900 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 w-full">
+                            <GraduationCap className="w-4 h-4 text-blue-700 shrink-0" />
+                            <span className="truncate">{isAr ? 'إطار جامعي (شرط الـ 33%)' : 'Diplômé Univ. (Quota 33%)'}</span>
+                          </div>
+                        )}
+                        {candidate.militaryStatus && (
+                          <div className="text-[10px] text-slate-500 font-medium">
+                            <span className="text-slate-400 uppercase font-bold">{isAr ? 'الخدمة الوطنية: ' : 'Service Nat. : '}</span>
+                            <span className="text-slate-700 font-semibold">{candidate.militaryStatus}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="pt-1 flex items-center justify-between">
-                        <span className="text-slate-500 text-[11px]">{isAr ? 'الانخراط:' : 'Adhésion :'}</span>
-                        <span className="font-semibold text-slate-800 text-[11px]">
-                          {isAr ? `منذ ${candidate.partyJoinYear}` : `Depuis ${candidate.partyJoinYear}`}
+                    </div>
+
+                    {/* 6. Militantisme FLN */}
+                    <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-slate-900 border-b border-slate-100 pb-1.5">
+                          <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                            <BadgeCheck className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-xs font-bold">{isAr ? '6. النضال في صفوف FLN' : '6. Militantisme FLN'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{isAr ? 'بطاقة المناضل:' : 'بطاقة / Carte :'}</span>
+                          <span className="font-mono font-bold text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 text-xs">
+                            {candidate.partyMembershipNumber || 'FLN-BO-1998-041'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">{isAr ? 'سنة الانخراط:' : 'Adhésion :'}</span>
+                          <span className="font-semibold text-slate-800">
+                            {candidate.partyJoinYear 
+                              ? (isAr ? `منخرط ${candidate.partyJoinYear} (${new Date().getFullYear() - candidate.partyJoinYear} سنة)` : `Adhérent ${candidate.partyJoinYear} (${new Date().getFullYear() - candidate.partyJoinYear} ans)`)
+                              : (isAr ? 'مناضل' : 'Militant FLN')}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100">
+                        <span className="text-slate-400 text-[10px] block uppercase font-bold tracking-wider">{isAr ? 'الصفة بالقسمة:' : 'Rôle Kasma :'}</span>
+                        <span className="text-xs text-slate-800 font-semibold truncate block mt-0.5">
+                          {candidate.partyRole || (isAr ? 'مناضل بالقسمة' : 'Militant actif')}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* 6. الوثائق الـ 11 مطابقة إدارية + 7. حالة الملف */}
-                  <div className="p-4 bg-white border-b border-slate-100 space-y-2.5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  {/* 7. Les 11 Pièces (Conformité) */}
+                  <div className="p-4 bg-white border-b border-slate-100 space-y-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-slate-600" />
-                        <span className="font-bold text-xs text-slate-800">
-                          {isAr ? '6. الوثائق الـ 11 (مطابقة إدارية)' : '6. Les 11 Pièces Administratives (Conformité)'}
-                        </span>
+                        <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                          <FileCheck className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-black text-xs sm:text-sm text-slate-900 block">
+                            {isAr ? '7. الوثائق الـ 11 (مطابقة إدارية)' : '7. Les 11 Pièces (Conformité)'}
+                          </span>
+                          <span className="text-[10.5px] text-slate-500 font-medium">
+                            {isAr ? 'الملف القانوني المودع لدى السلطة الوطنية المستقلة للانتخابات (ANIE)' : 'Dossier officiel réglementaire selon les conditions d\'éligibilité ANIE'}
+                          </span>
+                        </div>
                       </div>
 
-                      {/* 7. حالة الملف */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-500 font-medium">
-                          {isAr ? '7. حالة الملف:' : '7. Statut du dossier :'}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold ${
+                      {/* Badge 11/11 (100%) */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black shadow-2xs ${
                           compliance.isComplete
-                            ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                            : 'bg-amber-100 text-amber-900 border border-amber-300'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-amber-100 text-amber-950 border border-amber-300'
                         }`}>
-                          {compliance.isComplete ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Clock className="w-3.5 h-3.5 text-amber-600" />}
-                          <span>{compliance.conformeCount} / 11 ({compliance.percentage}%) • {compliance.isComplete ? (isAr ? 'جاهز 100%' : 'Complet') : (isAr ? 'قيد الاستكمال' : 'En cours')}</span>
+                          {compliance.isComplete ? <CheckCircle2 className="w-4 h-4 text-white" /> : <Clock className="w-4 h-4 text-amber-700" />}
+                          <span>{compliance.conformeCount}/11 ({compliance.percentage}%)</span>
+                          <span className="font-normal text-[11px] opacity-90">
+                            • {compliance.isComplete ? (isAr ? 'مكتمل 100%' : 'Complet') : (isAr ? 'قيد الاستكمال' : 'En cours')}
+                          </span>
                         </span>
                       </div>
                     </div>
 
-                    {/* 11 Document status pill bar */}
-                    <div className="grid grid-cols-6 sm:grid-cols-11 gap-1.5 py-1">
+                    {/* Clean progress bar */}
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/80">
+                      <div 
+                        className={`h-full transition-all duration-300 rounded-full ${
+                          compliance.isComplete ? 'bg-emerald-600' : 'bg-amber-500'
+                        }`}
+                        style={{ width: `${compliance.percentage}%` }}
+                      />
+                    </div>
+
+                    {/* 11 Document Cards Grid (Structured matrix with Number, Document Name and Conformity Status) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 pt-1">
                       {ADMINISTRATIVE_DOCUMENTS.map((docDef, idx) => {
                         const doc = candidate.documents?.[docDef.key];
                         const isDocConforme = doc?.status === 'conforme' || doc?.conforme === true;
@@ -993,21 +1063,67 @@ export const CandidatePortalView: React.FC<CandidatePortalViewProps> = ({
                             key={docDef.key}
                             type="button"
                             onClick={() => setActiveTab('documents')}
-                            title={`${idx + 1}. ${docDef.nameAr} (${docDef.nameFr}): ${
-                              isDocConforme ? 'مطابق ومقبول' : isDocNonConforme ? 'غير مطابق' : 'قيد الانتظار'
-                            } - انقر للمراجعة`}
-                            className={`h-8 rounded-lg flex items-center justify-center text-xs font-extrabold transition-all shadow-2xs cursor-pointer hover:scale-105 active:scale-95 ${
+                            className={`p-2.5 rounded-xl border text-start transition-all cursor-pointer hover:shadow-xs active:scale-98 flex items-center justify-between gap-2 ${
                               isDocConforme
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-950 hover:bg-emerald-100/80'
                                 : isDocNonConforme
-                                ? 'bg-rose-600 text-white hover:bg-rose-700'
-                                : 'bg-amber-300 text-amber-950 border border-amber-400 hover:bg-amber-400'
+                                ? 'bg-rose-50/70 border-rose-300 text-rose-950 hover:bg-rose-100/80'
+                                : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100'
                             }`}
                           >
-                            {idx + 1}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`w-6 h-6 rounded-lg shrink-0 flex items-center justify-center font-mono font-black text-xs ${
+                                isDocConforme
+                                  ? 'bg-emerald-600 text-white'
+                                  : isDocNonConforme
+                                  ? 'bg-rose-600 text-white'
+                                  : 'bg-slate-200 text-slate-700'
+                              }`}>
+                                {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="font-bold text-xs truncate leading-tight">
+                                  {isAr ? docDef.nameAr : docDef.nameFr}
+                                </p>
+                                <p className="text-[10px] text-slate-500 truncate leading-tight mt-0.5">
+                                  {isAr ? docDef.nameFr : docDef.nameAr}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="shrink-0">
+                              {isDocConforme ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                  <span>{isAr ? 'مطابق' : 'Conforme'}</span>
+                                </span>
+                              ) : isDocNonConforme ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md border border-rose-300">
+                                  <X className="w-3.5 h-3.5 text-rose-700" />
+                                  <span>{isAr ? 'مرفوض' : 'Rejeté'}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300">
+                                  <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                  <span>{isAr ? 'ناقص' : 'En attente'}</span>
+                                </span>
+                              )}
+                            </div>
                           </button>
                         );
                       })}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                      <span>{isAr ? 'انقر على أي وثيقة لعرض النسخة ورفع التحديثات' : 'Cliquez sur une pièce pour afficher le scan et téléverser votre document'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('documents')}
+                        className="text-emerald-700 font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>{isAr ? 'فحص وتعديل الوثائق الـ 11' : 'Gérer les 11 pièces'}</span>
+                        <FileCheck className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 

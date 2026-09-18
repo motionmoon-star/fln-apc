@@ -2,14 +2,49 @@ import { Candidate, CampaignStats } from '../types';
 import { ADMINISTRATIVE_DOCUMENTS } from '../data/documentsList';
 import { INITIAL_CANDIDATES } from '../data/initialCandidates';
 
-const STORAGE_KEY = 'fln_bologhine_candidates_v1';
+const STORAGE_KEY = 'fln_bologhine_candidates_v2';
+const LEGACY_STORAGE_KEY = 'fln_bologhine_candidates_v1';
 
 export function getStoredCandidates(): Candidate[] {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    // Check current storage key
+    let saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) {
+      // Check legacy storage
+      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy) {
+        saved = legacy;
+      }
+    }
+
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // Look for candidate Hasbaloui / Hasbaoui
+        const hasbaoui = parsed.find(c => {
+          const lFr = (c.lastNameFr || '').toUpperCase();
+          const fFr = (c.firstNameFr || '').toUpperCase();
+          const lAr = c.lastNameAr || '';
+          return lFr.includes('HASBA') || lFr.includes('HASBAL') || fFr.includes('HASBA') || lAr.includes('حسبلا');
+        });
+
+        if (hasbaoui) {
+          // Keep only Hasbaloui (1 single candidate)
+          const singleList = [hasbaoui];
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(singleList));
+          return singleList;
+        }
+
+        // If only legacy mock candidates were in storage (e.g., Belkacemi, Bouzidi), reset to INITIAL_CANDIDATES (Hasbaloui)
+        const isLegacyMocks = parsed.some(c => 
+          ['BELKACEMI', 'BOUZIDI', 'MEZIANE', 'CHAOUCHE', 'HAMDANI'].includes((c.lastNameFr || '').toUpperCase())
+        );
+
+        if (isLegacyMocks) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_CANDIDATES));
+          return INITIAL_CANDIDATES;
+        }
+
         return parsed;
       }
     }

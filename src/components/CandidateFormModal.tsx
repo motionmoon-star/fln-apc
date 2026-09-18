@@ -46,8 +46,15 @@ import {
   CheckCheck,
   ChevronDown,
   ChevronUp,
-  RotateCcw
+  RotateCcw,
+  PenLine,
+  Maximize2,
+  FileSignature,
+  Users,
+  Home
 } from 'lucide-react';
+import { CameraCaptureModal } from './CameraCaptureModal';
+import { DocumentTextModal } from './DocumentTextModal';
 
 interface CandidateFormModalProps {
   initialCandidate?: Candidate | null;
@@ -94,6 +101,7 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
   const [pasteTextContent, setPasteTextContent] = useState('');
   const [isDraggingWordFile, setIsDraggingWordFile] = useState(false);
   const [copiedTextSuccess, setCopiedTextSuccess] = useState(false);
+  const [selectedOtherDocKey, setSelectedOtherDocKey] = useState<string>('nationality_certificate');
 
   // Hidden inputs for each doc upload
   const docUploadRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -148,7 +156,7 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
     }) || null;
   }, [currentCleanNIN, existingCandidates, initialCandidate]);
 
-  // Document attachments (photos/scans/Word/PDF)
+  // Document attachments (photos/scans/Word/PDF/Text notes)
   const [attachedScans, setAttachedScans] = useState<Record<string, {
     fileDataUrl?: string;
     fileName?: string;
@@ -157,11 +165,13 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
     scannedAt?: string;
     referenceNumber?: string;
     issueDate?: string;
+    notes?: string;
+    authority?: string;
   }>>(() => {
     const res: Record<string, any> = {};
     if (initialCandidate?.documents) {
       for (const [k, v] of Object.entries(initialCandidate.documents)) {
-        if (v.fileDataUrl) {
+        if (v.fileDataUrl || v.notes || v.referenceNumber) {
           res[k] = {
             fileDataUrl: v.fileDataUrl,
             fileName: v.fileName,
@@ -170,6 +180,7 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
             scannedAt: v.scannedAt,
             referenceNumber: v.referenceNumber,
             issueDate: v.issueDate,
+            notes: v.notes,
           };
         }
       }
@@ -187,6 +198,45 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
     }
     return res;
   });
+
+  // Camera Live Capture Modal State
+  const [cameraModalConfig, setCameraModalConfig] = useState<{
+    isOpen: boolean;
+    docKey: string;
+    titleFr: string;
+    titleAr: string;
+    defaultFacingMode: 'environment' | 'user';
+    isPortrait?: boolean;
+  }>({
+    isOpen: false,
+    docKey: 'document',
+    titleFr: '',
+    titleAr: '',
+    defaultFacingMode: 'environment',
+  });
+
+  // Document Text / Reference Modal State
+  const [textModalConfig, setTextModalConfig] = useState<{
+    isOpen: boolean;
+    docKey: string;
+    titleFr: string;
+    titleAr: string;
+    initialReferenceNumber?: string;
+    initialIssueDate?: string;
+    initialNotes?: string;
+  }>({
+    isOpen: false,
+    docKey: '',
+    titleFr: '',
+    titleAr: '',
+  });
+
+  // Image Preview Modal State
+  const [previewModal, setPreviewModal] = useState<{
+    dataUrl: string;
+    title: string;
+    fileName?: string;
+  } | null>(null);
 
   // Pre-checked documents state
   const [docStatuses, setDocStatuses] = useState<Record<string, boolean>>(() => {
@@ -579,30 +629,75 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
     }
   };
 
-  // Direct file upload for any document (Word, PDF, image)
+  // Direct file upload for any document (Photo, PDF, Word, Text)
   const handleUploadFileForDoc = async (docKey: string, file: File) => {
     setProcessingDocKey(docKey);
     try {
       const docDef = ADMINISTRATIVE_DOCUMENTS.find(d => d.key === docKey);
       const processed = await processAnyDocumentFile(file);
 
-      // If it's a Word document or text and contains usable content, we can run OCR as well
+      // Extract data if usable content is present (Word, Text, Image, or PDF)
       let extractedData: ExtractedDocumentData | undefined;
-      if (processed.rawText && processed.rawText.length > 30) {
+      const hint = `${docDef?.nameFr || ''} (${docDef?.nameAr || ''}) pour dossier électoral FLN`;
+      
+      if (processed.rawText && processed.rawText.length > 20) {
         try {
           extractedData = await scanDocumentWithAI(
             undefined,
             processed.mimeType,
-            docDef?.nameFr,
+            hint,
             processed.rawText
           );
-          if (docKey === 'birth_certificate' && extractedData.birthDate) {
-            setBirthDate(extractedData.birthDate);
-            if (extractedData.birthPlace) setBirthPlace(extractedData.birthPlace);
-          }
         } catch {
-          // Silent fallback if text AI extraction fails
+          // Fallback if AI text extraction fails
         }
+      } else if (processed.dataUrl && (processed.fileType === 'image' || processed.fileType === 'pdf')) {
+        try {
+          extractedData = await scanDocumentWithAI(
+            processed.dataUrl,
+            processed.mimeType,
+            hint
+          );
+        } catch {
+          // Fallback if AI image/PDF scan fails
+        }
+      }
+
+      // Auto-populate candidate form fields based on extracted document data
+      if (extractedData) {
+        if (docKey === 'birth_certificate') {
+          if (extractedData.birthDate) setBirthDate(extractedData.birthDate);
+          if (extractedData.birthPlace) setBirthPlace(extractedData.birthPlace);
+          if (extractedData.lastNameFr && !lastNameFr) setLastNameFr(extractedData.lastNameFr.toUpperCase());
+          if (extractedData.firstNameFr && !firstNameFr) setFirstNameFr(extractedData.firstNameFr);
+          if (extractedData.lastNameAr && !lastNameAr) setLastNameAr(extractedData.lastNameAr);
+          if (extractedData.firstNameAr && !firstNameAr) setFirstNameAr(extractedData.firstNameAr);
+          if (extractedData.gender) setGender(extractedData.gender);
+        } else if (docKey === 'identity_card') {
+          if (extractedData.nationalIdNumber) setNationalIdNumber(extractedData.nationalIdNumber);
+          if (extractedData.lastNameFr && !lastNameFr) setLastNameFr(extractedData.lastNameFr.toUpperCase());
+          if (extractedData.firstNameFr && !firstNameFr) setFirstNameFr(extractedData.firstNameFr);
+          if (extractedData.lastNameAr && !lastNameAr) setLastNameAr(extractedData.lastNameAr);
+          if (extractedData.firstNameAr && !firstNameAr) setFirstNameAr(extractedData.firstNameAr);
+          if (extractedData.birthDate && !birthDate) setBirthDate(extractedData.birthDate);
+          if (extractedData.birthPlace && !birthPlace) setBirthPlace(extractedData.birthPlace);
+          if (extractedData.addressNeighborhood) setAddressNeighborhood(extractedData.addressNeighborhood);
+        } else if (docKey === 'residence_certificate') {
+          if (extractedData.addressNeighborhood) setAddressNeighborhood(extractedData.addressNeighborhood);
+        } else if (docKey === 'diploma_cv') {
+          setIsUniversityGraduate(true);
+          if (extractedData.educationLevel) setEducationLevel(extractedData.educationLevel);
+          if (extractedData.profession && !profession) setProfession(extractedData.profession);
+        } else if (docKey === 'military_status') {
+          if (extractedData.militaryStatus) setMilitaryStatus(extractedData.militaryStatus);
+        } else if (docKey === 'party_card') {
+          if (extractedData.partyMembershipNumber) setPartyMembershipNumber(extractedData.partyMembershipNumber);
+        }
+      }
+
+      // If document is photos, set photoUrl as official candidate picture
+      if (docKey === 'photos' && processed.dataUrl) {
+        setPhotoUrl(processed.dataUrl);
       }
 
       setAttachedScans(prev => ({
@@ -625,16 +720,178 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
       }));
 
       const isWord = processed.fileType === 'word';
+      const isImg = processed.fileType === 'image';
+      const isPdf = processed.fileType === 'pdf';
       setScanMessage(
         isAr 
-          ? `✓ تم إرفاق ملف ${isWord ? 'Word' : ''} (${processed.fileName}) لـ ${docDef?.nameAr} بنجاح!` 
-          : `✓ Fichier ${isWord ? 'Word (.docx/.doc)' : ''} (${processed.fileName}) joint avec succès pour ${docDef?.nameFr} !`
+          ? `✓ تم إرفاق ملف ${isWord ? 'Word' : isPdf ? 'PDF' : isImg ? 'صورة' : 'نص'} (${processed.fileName}) لـ ${docDef?.nameAr} وملء الحقول تلقائياً!` 
+          : `✓ Fichier ${isWord ? 'Word' : isPdf ? 'PDF' : isImg ? 'Photo' : 'Texte'} (${processed.fileName}) joint pour ${docDef?.nameFr} avec auto-complétion !`
       );
     } catch (err: any) {
       console.error(err);
       alert(isAr ? 'خطأ أثناء إرفاق الملف' : (err.message || 'Erreur lors du téléchargement du fichier'));
     } finally {
       setProcessingDocKey(null);
+    }
+  };
+
+  // Remove attached file only (keep text note if any)
+  const handleRemoveFileOnly = (docKey: string) => {
+    setAttachedScans(prev => {
+      const current = prev[docKey];
+      if (!current) return prev;
+      if (current.notes || current.referenceNumber) {
+        return {
+          ...prev,
+          [docKey]: {
+            notes: current.notes,
+            referenceNumber: current.referenceNumber,
+            issueDate: current.issueDate,
+          }
+        };
+      }
+      const next = { ...prev };
+      delete next[docKey];
+      return next;
+    });
+  };
+
+  // Remove text note only (keep file if any)
+  const handleRemoveTextNote = (docKey: string) => {
+    setAttachedScans(prev => {
+      const current = prev[docKey];
+      if (!current) return prev;
+      if (current.fileDataUrl) {
+        const copy = { ...current };
+        delete copy.notes;
+        delete copy.referenceNumber;
+        return {
+          ...prev,
+          [docKey]: copy,
+        };
+      }
+      const next = { ...prev };
+      delete next[docKey];
+      return next;
+    });
+  };
+
+  // Save textual notes and references for a document
+  const handleSaveDocumentText = (
+    docKey: string,
+    data: { referenceNumber?: string; issueDate?: string; notes?: string; authority?: string }
+  ) => {
+    setAttachedScans(prev => ({
+      ...prev,
+      [docKey]: {
+        ...(prev[docKey] || {}),
+        referenceNumber: data.referenceNumber,
+        issueDate: data.issueDate,
+        notes: data.notes,
+        authority: data.authority,
+        scannedAt: prev[docKey]?.scannedAt || new Date().toISOString(),
+      }
+    }));
+    setDocStatuses(prev => ({
+      ...prev,
+      [docKey]: true,
+    }));
+    const docDef = ADMINISTRATIVE_DOCUMENTS.find(d => d.key === docKey);
+    setScanMessage(
+      isAr 
+        ? `✓ تم تدوين بيانات ومرجع وثيقة: ${docDef?.nameAr || docKey} بنجاح!` 
+        : `✓ Référence et mentions enregistrées pour ${docDef?.nameFr || docKey} !`
+    );
+  };
+
+  // Live camera photo capture for any document or candidate portrait
+  const handleCameraCapture = async (dataUrl: string, fileName: string) => {
+    const docKey = cameraModalConfig.docKey;
+    if (cameraModalConfig.isPortrait) {
+      setPhotoUrl(dataUrl);
+      setAttachedScans(prev => ({
+        ...prev,
+        photos: {
+          fileDataUrl: dataUrl,
+          fileName,
+          fileSize: Math.round((dataUrl.length * 3) / 4),
+          fileType: 'image',
+          scannedAt: new Date().toISOString(),
+        }
+      }));
+      setDocStatuses(prev => ({ ...prev, photos: true }));
+      setScanMessage(isAr ? '✓ تم التقاط صورة المترشح الرسمية بنجاح!' : '✓ Photo officielle du candidat enregistrée avec succès !');
+      return;
+    }
+
+    const docDef = ADMINISTRATIVE_DOCUMENTS.find(d => d.key === docKey);
+    setAttachedScans(prev => ({
+      ...prev,
+      [docKey]: {
+        ...(prev[docKey] || {}),
+        fileDataUrl: dataUrl,
+        fileName,
+        fileSize: Math.round((dataUrl.length * 3) / 4),
+        fileType: 'image',
+        scannedAt: new Date().toISOString(),
+      }
+    }));
+    setDocStatuses(prev => ({ ...prev, [docKey]: true }));
+
+    // Run OCR analysis to auto-populate form fields
+    try {
+      const hint = `${docDef?.nameFr || ''} (${docDef?.nameAr || ''}) pour dossier électoral algérien`;
+      const extracted = await scanDocumentWithAI(dataUrl, 'image/jpeg', hint);
+      
+      if (docKey === 'birth_certificate') {
+        if (extracted.birthDate) setBirthDate(extracted.birthDate);
+        if (extracted.birthPlace) setBirthPlace(extracted.birthPlace);
+        if (extracted.lastNameFr && !lastNameFr) setLastNameFr(extracted.lastNameFr.toUpperCase());
+        if (extracted.firstNameFr && !firstNameFr) setFirstNameFr(extracted.firstNameFr);
+        if (extracted.lastNameAr && !lastNameAr) setLastNameAr(extracted.lastNameAr);
+        if (extracted.firstNameAr && !firstNameAr) setFirstNameAr(extracted.firstNameAr);
+        if (extracted.gender) setGender(extracted.gender);
+      } else if (docKey === 'identity_card') {
+        if (extracted.nationalIdNumber) setNationalIdNumber(extracted.nationalIdNumber);
+        if (extracted.lastNameFr && !lastNameFr) setLastNameFr(extracted.lastNameFr.toUpperCase());
+        if (extracted.firstNameFr && !firstNameFr) setFirstNameFr(extracted.firstNameFr);
+        if (extracted.lastNameAr && !lastNameAr) setLastNameAr(extracted.lastNameAr);
+        if (extracted.firstNameAr && !firstNameAr) setFirstNameAr(extracted.firstNameAr);
+        if (extracted.addressNeighborhood) setAddressNeighborhood(extracted.addressNeighborhood);
+      } else if (docKey === 'police_record') {
+        if (extracted.referenceNumber) {
+          setAttachedScans(prev => ({
+            ...prev,
+            police_record: {
+              ...prev.police_record,
+              referenceNumber: extracted.referenceNumber,
+              issueDate: extracted.issueDate || prev.police_record?.issueDate,
+            }
+          }));
+        }
+      } else if (docKey === 'residence_certificate') {
+        if (extracted.addressNeighborhood) setAddressNeighborhood(extracted.addressNeighborhood);
+      } else if (docKey === 'diploma_cv') {
+        setIsUniversityGraduate(true);
+        if (extracted.educationLevel) setEducationLevel(extracted.educationLevel);
+        if (extracted.profession && !profession) setProfession(extracted.profession);
+      } else if (docKey === 'military_status') {
+        if (extracted.militaryStatus) setMilitaryStatus(extracted.militaryStatus);
+      } else if (docKey === 'party_card') {
+        if (extracted.partyMembershipNumber) setPartyMembershipNumber(extracted.partyMembershipNumber);
+      }
+
+      setScanMessage(
+        isAr 
+          ? `✓ تم التقاط صورة وثيقة: ${docDef?.nameAr || docKey} واستخراج البيانات بنجاح!` 
+          : `✓ Photo de ${docDef?.nameFr || docKey} capturée et données extraites !`
+      );
+    } catch {
+      setScanMessage(
+        isAr 
+          ? `✓ تم التقاط وإرفاق صورة: ${docDef?.nameAr || docKey} بنجاح!` 
+          : `✓ Photo de ${docDef?.nameFr || docKey} jointe au dossier !`
+      );
     }
   };
 
@@ -704,7 +961,7 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
         conforme: isConforme,
         issueDate: scan?.issueDate || (isConforme ? (initialCandidate?.documents?.[def.key]?.issueDate || new Date().toISOString().slice(0, 10)) : undefined),
         referenceNumber: scan?.referenceNumber || initialCandidate?.documents?.[def.key]?.referenceNumber,
-        notes: isConforme ? 'Document vérifié et conforme' : 'En attente de délivrance',
+        notes: scan?.notes || initialCandidate?.documents?.[def.key]?.notes || (isConforme ? 'Document vérifié et conforme' : 'En attente de délivrance'),
         fileDataUrl: scan?.fileDataUrl || initialCandidate?.documents?.[def.key]?.fileDataUrl,
         fileName: scan?.fileName || initialCandidate?.documents?.[def.key]?.fileName,
         fileType: scan?.fileType || initialCandidate?.documents?.[def.key]?.fileType,
@@ -1168,6 +1425,839 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* SECTION: PIÈCES ADMINISTRATIVES & REMPLISSAGE DU FORMULAIRE */}
+              <div className="bg-gradient-to-br from-emerald-50/70 via-white to-slate-50 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300/80 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-emerald-200">
+                  <div className="flex items-start sm:items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-800 text-amber-300 flex items-center justify-center shrink-0 shadow-2xs">
+                      <FileCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm sm:text-base font-extrabold text-emerald-950">
+                          {isAr ? 'الوثائق الإدارية لملء الاستمارة تلقائياً' : 'Documents Administratifs pour Remplissage Automatique'}
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                          {isAr ? 'كاميرا • صورة • PDF • نص' : 'Caméra • Photo • PDF • Texte'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {isAr
+                          ? 'التقاط صورة مباشرة بالكاميرا أو إرفاق ملف (صورة / PDF / نص) لملء وتدعيم ملف المترشح (شهادة الميلاد، السوابق، الإقامة، الهوية)'
+                          : 'Prenez une photo en direct ou joignez un fichier (Photo, PDF, Texte) pour la fiche familiale, casier judiciaire B3, résidence, CNI et autres documents.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('documents')}
+                      className="text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-white hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-300 shadow-2xs inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>{isAr ? 'عرض الملف الكامل (11 وثيقة) ➔' : 'Voir les 11 pièces administratives ➔'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 4 PRIORITY DOCUMENTS GRID */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  {/* 1. FICHE FAMILIALE & ACTE DE NAISSANCE */}
+                  {(() => {
+                    const docKey = 'birth_certificate';
+                    const scan = attachedScans[docKey];
+                    const isConform = docStatuses[docKey];
+                    const isProcessing = processingDocKey === docKey;
+                    const isImg = scan?.fileType === 'image';
+
+                    return (
+                      <div className="p-3.5 rounded-xl bg-white border border-emerald-200/90 shadow-2xs hover:border-emerald-400 transition-all flex flex-col justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 mt-0.5">
+                              <Users className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {isAr ? 'البطاقة العائلية وشهادة الميلاد (عقد 12)' : 'Fiche familiale & Acte de naissance'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                {isAr ? 'عقد الميلاد 12 أو الدفتر العائلي لاستخراج السن والنسب' : 'Renseigne automatiquement : Nom, Prénom, Date/Lieu naiss.'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {isConform || scan ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {isAr ? 'جاهز' : 'Validé'}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                {isAr ? 'مطلوب' : 'Requis'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Attachment Preview (if any) */}
+                        {scan && (
+                          <div className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {scan.fileDataUrl && isImg ? (
+                                <img
+                                  src={scan.fileDataUrl}
+                                  alt="Aperçu"
+                                  onClick={() => setPreviewModal({
+                                    dataUrl: scan.fileDataUrl!,
+                                    title: 'Fiche familiale & Acte de naissance',
+                                    fileName: scan.fileName
+                                  })}
+                                  className="w-7 h-7 rounded object-cover border border-emerald-400 cursor-pointer shrink-0"
+                                  title="Agrandir"
+                                />
+                              ) : (
+                                <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <span className="font-semibold text-emerald-950 text-[11px] truncate block">
+                                  {scan.fileName || 'Fiche familiale jointe'}
+                                </span>
+                                {(scan.referenceNumber || scan.issueDate) && (
+                                  <span className="text-[10px] text-emerald-800 block">
+                                    {scan.referenceNumber ? `Réf: ${scan.referenceNumber}` : ''} {scan.issueDate ? `(${scan.issueDate})` : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {scan.fileDataUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewModal({
+                                    dataUrl: scan.fileDataUrl!,
+                                    title: 'Fiche familiale & Acte de naissance',
+                                    fileName: scan.fileName
+                                  })}
+                                  className="p-1 rounded text-emerald-700 hover:bg-emerald-200"
+                                  title="Aperçu"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFileOnly(docKey)}
+                                className="p-1 rounded text-rose-600 hover:bg-rose-100"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-100">
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() => setCameraModalConfig({
+                              isOpen: true,
+                              docKey,
+                              titleFr: 'Fiche familiale & Acte de naissance (عقد 12)',
+                              titleAr: 'البطاقة العائلية وشهادة الميلاد (عقد 12)',
+                              defaultFacingMode: 'environment'
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Prendre une photo par la caméra pour remplir automatiquement"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                            <span className="truncate">{isAr ? 'كاميرا' : 'Caméra'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() => docUploadRefs.current[docKey]?.click()}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-emerald-50 hover:text-emerald-800 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Joindre un fichier (Photo, PDF, Word ou Texte)"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span className="truncate">{isAr ? 'ملف/PDF' : 'Photo/PDF'}</span>
+                          </button>
+                          <input
+                            ref={el => { docUploadRefs.current[docKey] = el; }}
+                            type="file"
+                            accept=".pdf,image/*,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                            className="hidden"
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadFileForDoc(docKey, f);
+                              e.target.value = '';
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => setTextModalConfig({
+                              isOpen: true,
+                              docKey,
+                              titleFr: 'Fiche familiale & Acte de naissance',
+                              titleAr: 'البطاقة العائلية وشهادة الميلاد',
+                              initialReferenceNumber: scan?.referenceNumber,
+                              initialIssueDate: scan?.issueDate,
+                              initialNotes: scan?.notes
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Saisir les références officielles ou notes"
+                          >
+                            <PenLine className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="truncate">{isAr ? 'تدوين نص' : 'Texte/Réf'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 2. CASIER JUDICIAIRE (BULLETIN N°3) */}
+                  {(() => {
+                    const docKey = 'police_record';
+                    const scan = attachedScans[docKey];
+                    const isConform = docStatuses[docKey];
+                    const isProcessing = processingDocKey === docKey;
+                    const isImg = scan?.fileType === 'image';
+
+                    return (
+                      <div className="p-3.5 rounded-xl bg-white border border-emerald-200/90 shadow-2xs hover:border-emerald-400 transition-all flex flex-col justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center shrink-0 mt-0.5">
+                              <Award className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {isAr ? 'صحيفة السوابق القضائية (القسيمة رقم 3)' : 'Casier Judiciaire (Bulletin n°3)'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                {isAr ? 'صادر عن محكمة باب الوادي أو وزارة العدل (- 3 أشهر)' : 'Tribunal de Bab El Oued ou Guichet Justice (- 3 mois)'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {isConform || scan ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {isAr ? 'جاهز' : 'Validé'}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                {isAr ? 'مطلوب' : 'Requis'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Attachment Preview */}
+                        {scan && (
+                          <div className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {scan.fileDataUrl && isImg ? (
+                                <img
+                                  src={scan.fileDataUrl}
+                                  alt="Aperçu"
+                                  onClick={() => setPreviewModal({
+                                    dataUrl: scan.fileDataUrl!,
+                                    title: 'Casier Judiciaire (B3)',
+                                    fileName: scan.fileName
+                                  })}
+                                  className="w-7 h-7 rounded object-cover border border-emerald-400 cursor-pointer shrink-0"
+                                  title="Agrandir"
+                                />
+                              ) : (
+                                <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <span className="font-semibold text-emerald-950 text-[11px] truncate block">
+                                  {scan.fileName || 'Casier judiciaire joint'}
+                                </span>
+                                {(scan.referenceNumber || scan.issueDate) && (
+                                  <span className="text-[10px] text-emerald-800 block">
+                                    {scan.referenceNumber ? `N° B3: ${scan.referenceNumber}` : ''} {scan.issueDate ? `(${scan.issueDate})` : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {scan.fileDataUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewModal({
+                                    dataUrl: scan.fileDataUrl!,
+                                    title: 'Casier Judiciaire (B3)',
+                                    fileName: scan.fileName
+                                  })}
+                                  className="p-1 rounded text-emerald-700 hover:bg-emerald-200"
+                                  title="Aperçu"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFileOnly(docKey)}
+                                className="p-1 rounded text-rose-600 hover:bg-rose-100"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-100">
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() => setCameraModalConfig({
+                              isOpen: true,
+                              docKey,
+                              titleFr: 'Casier Judiciaire (Bulletin n°3)',
+                              titleAr: 'صحيفة السوابق القضائية (القسيمة رقم 3)',
+                              defaultFacingMode: 'environment'
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Photographier le casier B3 pour extraction et pièce jointe"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                            <span className="truncate">{isAr ? 'كاميرا' : 'Caméra'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() => docUploadRefs.current[docKey]?.click()}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-emerald-50 hover:text-emerald-800 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Joindre un fichier (Photo, PDF ou Texte)"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span className="truncate">{isAr ? 'ملف/PDF' : 'Photo/PDF'}</span>
+                          </button>
+                          <input
+                            ref={el => { docUploadRefs.current[docKey] = el; }}
+                            type="file"
+                            accept=".pdf,image/*,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                            className="hidden"
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadFileForDoc(docKey, f);
+                              e.target.value = '';
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => setTextModalConfig({
+                              isOpen: true,
+                              docKey,
+                              titleFr: 'Casier Judiciaire (Bulletin n°3)',
+                              titleAr: 'صحيفة السوابق القضائية (القسيمة رقم 3)',
+                              initialReferenceNumber: scan?.referenceNumber,
+                              initialIssueDate: scan?.issueDate,
+                              initialNotes: scan?.notes
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Saisir le numéro de bulletin et la date de délivrance"
+                          >
+                            <PenLine className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="truncate">{isAr ? 'تدوين نص' : 'Texte/Réf'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 3. CERTIFICAT DE RÉSIDENCE */}
+                  {(() => {
+                    const docKey = 'residence_certificate';
+                    const scan = attachedScans[docKey];
+                    const isConform = docStatuses[docKey];
+                    const isProcessing = processingDocKey === docKey;
+                    const isImg = scan?.fileType === 'image';
+
+                    return (
+                      <div className="p-3.5 rounded-xl bg-white border border-emerald-200/90 shadow-2xs hover:border-emerald-400 transition-all flex flex-col justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                              <Home className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {isAr ? 'شهادة الإقامة ببلدية بولوغين' : 'Certificat de Résidence'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                {isAr ? 'إثبات الإقامة الفعلية في بلدية بولوغين أو الدائرة الانتخابية' : 'Atteste l\'établissement effectif dans la commune de Bologhine'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {isConform || scan ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {isAr ? 'جاهز' : 'Validé'}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                {isAr ? 'مطلوب' : 'Requis'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Attachment Preview */}
+                        {scan && (
+                          <div className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {scan.fileDataUrl && isImg ? (
+                                <img
+                                  src={scan.fileDataUrl}
+                                  alt="Aperçu"
+                                  onClick={() => setPreviewModal({
+                                    dataUrl: scan.fileDataUrl!,
+                                    title: 'Certificat de Résidence',
+                                    fileName: scan.fileName
+                                  })}
+                                  className="w-7 h-7 rounded object-cover border border-emerald-400 cursor-pointer shrink-0"
+                                  title="Agrandir"
+                                />
+                              ) : (
+                                <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <span className="font-semibold text-emerald-950 text-[11px] truncate block">
+                                  {scan.fileName || 'Certificat de résidence joint'}
+                                </span>
+                                {(scan.referenceNumber || addressNeighborhood) && (
+                                  <span className="text-[10px] text-emerald-800 block">
+                                    {addressNeighborhood ? `Quartier: ${addressNeighborhood}` : ''} {scan.referenceNumber ? `(Réf: ${scan.referenceNumber})` : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {scan.fileDataUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewModal({
+                                    dataUrl: scan.fileDataUrl!,
+                                    title: 'Certificat de Résidence',
+                                    fileName: scan.fileName
+                                  })}
+                                  className="p-1 rounded text-emerald-700 hover:bg-emerald-200"
+                                  title="Aperçu"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFileOnly(docKey)}
+                                className="p-1 rounded text-rose-600 hover:bg-rose-100"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-100">
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() => setCameraModalConfig({
+                              isOpen: true,
+                              docKey,
+                              titleFr: 'Certificat de Résidence',
+                              titleAr: 'شهادة الإقامة ببلدية بولوغين',
+                              defaultFacingMode: 'environment'
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Prendre photo de la résidence avec caméra"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                            <span className="truncate">{isAr ? 'كاميرا' : 'Caméra'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() => docUploadRefs.current[docKey]?.click()}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-emerald-50 hover:text-emerald-800 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Joindre un fichier (Photo, PDF ou Texte)"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span className="truncate">{isAr ? 'ملف/PDF' : 'Photo/PDF'}</span>
+                          </button>
+                          <input
+                            ref={el => { docUploadRefs.current[docKey] = el; }}
+                            type="file"
+                            accept=".pdf,image/*,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                            className="hidden"
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadFileForDoc(docKey, f);
+                              e.target.value = '';
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => setTextModalConfig({
+                              isOpen: true,
+                              docKey,
+                              titleFr: 'Certificat de Résidence',
+                              titleAr: 'شهادة الإقامة ببلدية بولوغين',
+                              initialReferenceNumber: scan?.referenceNumber,
+                              initialIssueDate: scan?.issueDate,
+                              initialNotes: scan?.notes
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Saisir adresse et référence"
+                          >
+                            <PenLine className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span className="truncate">{isAr ? 'تدوين نص' : 'Texte/Réf'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 4. PHOTO D'IDENTITÉ & CARTE NATIONALE CNI */}
+                  {(() => {
+                    const cniScan = attachedScans['identity_card'];
+                    const photoScan = attachedScans['photos'];
+                    const hasPhoto = Boolean(photoUrl || photoScan);
+                    const isCniConform = docStatuses['identity_card'];
+
+                    return (
+                      <div className="p-3.5 rounded-xl bg-white border border-emerald-200/90 shadow-2xs hover:border-emerald-400 transition-all flex flex-col justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-800 flex items-center justify-center shrink-0 mt-0.5">
+                              <CreditCard className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {isAr ? 'صورة الهوية & بطاقة التعريف (CNI)' : 'Photo d\'Identité & Carte CNI'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                {isAr ? 'صورة شمسية رسمية وبطاقة التعريف البيومترية (NIN)' : 'Photo officielle du candidat et numéro NIN'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0">
+                            {hasPhoto || isCniConform ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {isAr ? 'جاهز' : 'Validé'}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                {isAr ? 'مطلوب' : 'Requis'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Previews: Photo & CNI */}
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 text-xs">
+                          {photoUrl ? (
+                            <img
+                              src={photoUrl}
+                              alt="Photo candidat"
+                              className="w-8 h-9 rounded object-cover border border-emerald-500 shadow-2xs shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-9 rounded bg-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                              <Camera className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-slate-900 text-[11px] truncate block">
+                              {photoUrl ? (isAr ? '✓ الصورة الرسمية مسجلة' : '✓ Photo officielle enregistrée') : (isAr ? 'الصورة غير متوفرة' : 'Photo en attente')}
+                            </span>
+                            <span className="text-[10px] text-slate-600 truncate block">
+                              {nationalIdNumber ? `NIN: ${nationalIdNumber}` : (cniScan?.fileName ? `CNI: ${cniScan.fileName}` : (isAr ? 'بطاقة التعريف البيومترية' : 'Carte d\'identité biométrique'))}
+                            </span>
+                          </div>
+                          {photoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPhotoUrl('');
+                                handleRemoveFileOnly('photos');
+                              }}
+                              className="p-1 rounded text-rose-600 hover:bg-rose-100 shrink-0"
+                              title="Supprimer la photo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-100">
+                          {/* Photo Portrait with live camera */}
+                          <button
+                            type="button"
+                            onClick={() => setCameraModalConfig({
+                              isOpen: true,
+                              docKey: 'photos',
+                              titleFr: 'Photo d\'identité officielle du candidat',
+                              titleAr: 'التقاط الصورة الرسمية للمترشح (سيلفي / بورتريه)',
+                              defaultFacingMode: 'user',
+                              isPortrait: true
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-lg text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Prendre la photo d'identité officielle directement par caméra selfie/webcam"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                            <span className="truncate">{isAr ? 'صورة كاميرا' : 'Photo Caméra'}</span>
+                          </button>
+
+                          {/* Scanner CNI with camera */}
+                          <button
+                            type="button"
+                            onClick={() => setCameraModalConfig({
+                              isOpen: true,
+                              docKey: 'identity_card',
+                              titleFr: 'Carte Nationale d\'Identité (CNI)',
+                              titleAr: 'مسح بطاقة التعريف الوطنية البيومترية',
+                              defaultFacingMode: 'environment'
+                            })}
+                            className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-lg text-xs font-bold bg-slate-800 text-white hover:bg-slate-700 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Scanner la carte d'identité CNI par caméra"
+                          >
+                            <CreditCard className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="truncate">{isAr ? 'مسح CNI' : 'Scanner CNI'}</span>
+                          </button>
+
+                          {/* Upload CNI or Photo file */}
+                          <button
+                            type="button"
+                            onClick={() => docUploadRefs.current['identity_card']?.click()}
+                            className="flex items-center justify-center gap-1 py-1.5 px-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-emerald-50 transition-all cursor-pointer shadow-2xs truncate"
+                            title="Joindre un fichier Photo, PDF ou Texte de la CNI"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span className="truncate">{isAr ? 'ملف CNI' : 'Fichier CNI'}</span>
+                          </button>
+                          <input
+                            ref={el => { docUploadRefs.current['identity_card'] = el; }}
+                            type="file"
+                            accept=".pdf,image/*,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                            className="hidden"
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadFileForDoc('identity_card', f);
+                              e.target.value = '';
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 5. AUTRES DOCUMENTS DU DOSSIER (SÉLECTEUR RAPIDE : NATIONALITÉ, FISC, MILITAIRE, DIPLÔME, FLN...) */}
+                {(() => {
+                  const otherDocDef = ADMINISTRATIVE_DOCUMENTS.find(d => d.key === selectedOtherDocKey) || ADMINISTRATIVE_DOCUMENTS[3];
+                  const scan = attachedScans[selectedOtherDocKey];
+                  const isConform = docStatuses[selectedOtherDocKey];
+                  const isProcessing = processingDocKey === selectedOtherDocKey;
+
+                  return (
+                    <div className="p-3 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                            {isAr ? 'وثيقة إدارية أخرى للملف:' : 'Autre document administratif du dossier :'}
+                          </span>
+                          <select
+                            value={selectedOtherDocKey}
+                            onChange={e => setSelectedOtherDocKey(e.target.value)}
+                            className="text-xs font-bold text-emerald-950 bg-white border border-emerald-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none shadow-2xs"
+                          >
+                            <option value="nationality_certificate">
+                              {isAr ? 'شهادة الجنسية الجزائرية' : 'Certificat de nationalité'}
+                            </option>
+                            <option value="tax_clearance">
+                              {isAr ? 'مستخرج جدول الضرائب (مصفى)' : 'Extrait de rôle fiscal (Apuré)'}
+                            </option>
+                            <option value="military_status">
+                              {isAr ? 'الوضعية تجاه الخدمة الوطنية' : 'Situation militaire (Service national)'}
+                            </option>
+                            <option value="voter_card">
+                              {isAr ? 'بطاقة الناخب (ANIE)' : 'Carte d\'électeur (ANIE)'}
+                            </option>
+                            <option value="diploma_cv">
+                              {isAr ? 'الشهادة العلمية والسيرة الذاتية' : 'Diplôme universitaire & CV'}
+                            </option>
+                            <option value="party_card">
+                              {isAr ? 'بطاقة المناضل لحزب FLN' : 'Carte de militant FLN'}
+                            </option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {isConform || scan ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              {isAr ? 'هذه الوثيقة مرفقة' : 'Document joint'}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-200 text-slate-700">
+                              {isAr ? 'غير مرفق بعد' : 'Non joint'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Selected doc attachment preview */}
+                      {scan && (
+                        <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {scan.fileDataUrl && scan.fileType === 'image' ? (
+                              <img
+                                src={scan.fileDataUrl}
+                                alt="Aperçu"
+                                onClick={() => setPreviewModal({
+                                  dataUrl: scan.fileDataUrl!,
+                                  title: otherDocDef.nameFr,
+                                  fileName: scan.fileName
+                                })}
+                                className="w-7 h-7 rounded object-cover border border-emerald-400 cursor-pointer shrink-0"
+                              />
+                            ) : (
+                              <FileText className="w-4 h-4 text-emerald-700 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <span className="font-semibold text-emerald-950 text-[11px] truncate block">
+                                {scan.fileName || otherDocDef.nameFr}
+                              </span>
+                              {(scan.referenceNumber || scan.issueDate) && (
+                                <span className="text-[10px] text-emerald-800 block">
+                                  {scan.referenceNumber ? `Réf: ${scan.referenceNumber}` : ''} {scan.issueDate ? `(${scan.issueDate})` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {scan.fileDataUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewModal({
+                                  dataUrl: scan.fileDataUrl!,
+                                  title: otherDocDef.nameFr,
+                                  fileName: scan.fileName
+                                })}
+                                className="p-1 rounded text-emerald-700 hover:bg-emerald-200"
+                                title="Aperçu"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFileOnly(selectedOtherDocKey)}
+                              className="p-1 rounded text-rose-600 hover:bg-rose-100"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action buttons for other document */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => setCameraModalConfig({
+                            isOpen: true,
+                            docKey: selectedOtherDocKey,
+                            titleFr: otherDocDef.nameFr,
+                            titleAr: otherDocDef.nameAr,
+                            defaultFacingMode: 'environment'
+                          })}
+                          className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-amber-300" />
+                          <span>{isAr ? 'أخذ صورة بالكاميرا' : 'Photo Caméra'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() => docUploadRefs.current[selectedOtherDocKey]?.click()}
+                          className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-emerald-50 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>{isAr ? 'إرفاق ملف (صورة / PDF / نص)' : 'Joindre Fichier (Photo, PDF, Texte)'}</span>
+                        </button>
+                        <input
+                          ref={el => { docUploadRefs.current[selectedOtherDocKey] = el; }}
+                          type="file"
+                          accept=".pdf,image/*,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                          className="hidden"
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) handleUploadFileForDoc(selectedOtherDocKey, f);
+                            e.target.value = '';
+                          }}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => setTextModalConfig({
+                            isOpen: true,
+                            docKey: selectedOtherDocKey,
+                            titleFr: otherDocDef.nameFr,
+                            titleAr: otherDocDef.nameAr,
+                            initialReferenceNumber: scan?.referenceNumber,
+                            initialIssueDate: scan?.issueDate,
+                            initialNotes: scan?.notes
+                          })}
+                          className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <PenLine className="w-3.5 h-3.5 text-blue-600" />
+                          <span>{isAr ? 'تدوين نص / مرجع' : 'Saisir Texte / Réf'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Photo & Main Names Header */}
@@ -1847,65 +2937,45 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Action Toolbar for this Document - Responsive 3-col grid on mobile, inline on desktop */}
-                        <div className="w-full sm:w-auto grid grid-cols-3 sm:flex items-center gap-1.5 mt-2.5 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-slate-100 shrink-0">
+                        {/* Action Toolbar for this Document - 4 Flexible Options: Live Camera Photo, File (Photo/PDF), Text/Reference Note, Word Model */}
+                        <div className="w-full sm:w-auto grid grid-cols-2 sm:flex items-center gap-1.5 mt-2.5 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-slate-100 shrink-0">
                           
-                          {/* 1. Télécharger (Download attached file OR official Word model) */}
+                          {/* 1. 📸 Prendre Photo en Direct par Caméra / Webcam */}
                           <button
                             type="button"
+                            disabled={isProcessing}
                             onClick={() => {
-                              if (scan?.fileDataUrl) {
-                                downloadDocumentFile(scan.fileDataUrl, scan.fileName || `${docDef.key}.doc`);
-                              } else {
-                                downloadOfficialModelWord(
-                                  docDef.key, 
-                                  docDef.nameFr, 
-                                  docDef.nameAr, 
-                                  { 
-                                    lastNameFr, 
-                                    firstNameFr, 
-                                    lastNameAr, 
-                                    firstNameAr, 
-                                    birthDate, 
-                                    birthPlace, 
-                                    nationalIdNumber, 
-                                    council, 
-                                    listRank, 
-                                    profession 
-                                  }
-                                );
-                              }
+                              setCameraModalConfig({
+                                isOpen: true,
+                                docKey: docDef.key,
+                                titleFr: docDef.nameFr,
+                                titleAr: docDef.nameAr,
+                                defaultFacingMode: docDef.key === 'photos' ? 'user' : 'environment',
+                                isPortrait: docDef.key === 'photos',
+                              });
                             }}
-                            className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs text-center truncate ${
-                              scan?.fileDataUrl
-                                ? 'bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100'
-                                : 'bg-slate-50 text-slate-700 border border-slate-300 hover:bg-slate-100'
-                            }`}
-                            title={scan?.fileDataUrl ? "Télécharger le document joint" : "Télécharger le modèle officiel Word (.doc) pré-rempli"}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-emerald-800 text-white hover:bg-emerald-900 transition-all cursor-pointer shadow-xs disabled:opacity-50 text-center truncate"
+                            title={isAr ? 'التقاط صورة للوثيقة مباشرة بالكاميرا' : 'Prendre une photo directe du document avec la caméra'}
                           >
-                            <Download className="w-3.5 h-3.5 text-blue-700 shrink-0" />
-                            <span className="truncate">
-                              {scan?.fileDataUrl 
-                                ? (isAr ? 'تحميل' : 'Télécharger') 
-                                : (isAr ? 'Word' : 'Modèle')}
-                            </span>
+                            <Camera className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                            <span className="truncate">{isAr ? 'كاميرا' : 'Photo'}</span>
                           </button>
 
-                          {/* 2. Uploader directement (Word, PDF, Photo) */}
+                          {/* 2. 📁 Importer Fichier (Photo ou PDF ou Word) */}
                           <button
                             type="button"
                             disabled={isProcessing}
                             onClick={() => docUploadRefs.current[docDef.key]?.click()}
                             className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-white text-slate-800 border border-slate-300 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs text-center truncate"
-                            title="Joindre un fichier Word (.docx, .doc), PDF ou Image"
+                            title={isAr ? 'إرفاق ملف صورة (JPG/PNG) أو مستند PDF' : 'Joindre un fichier Photo (JPG/PNG) ou document PDF'}
                           >
                             <Upload className="w-3.5 h-3.5 text-emerald-800 shrink-0" />
-                            <span className="truncate">{isAr ? 'رفع ملف' : 'Upload'}</span>
+                            <span className="truncate">{isAr ? 'ملف (PDF/صورة)' : 'Fichier / PDF'}</span>
                           </button>
                           <input
                             ref={el => { docUploadRefs.current[docDef.key] = el; }}
                             type="file"
-                            accept=".doc,.docx,.pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            accept=".pdf,image/*,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                             className="hidden"
                             onChange={e => {
                               const f = e.target.files?.[0];
@@ -1914,37 +2984,67 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
                             }}
                           />
 
-                          {/* 3. Scanner / OCR direct par photo */}
+                          {/* 3. ✍️ Saisie de Texte / Référence officielle */}
                           <button
                             type="button"
-                            disabled={isProcessing}
-                            onClick={() => docCameraRefs.current[docDef.key]?.click()}
-                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-800 transition-all cursor-pointer shadow-xs disabled:opacity-50 text-center truncate"
-                            title="Numériser ou photographier par OCR pour renseigner automatiquement les données"
-                          >
-                            {isProcessing ? (
-                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
-                            ) : (
-                              <Camera className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                            )}
-                            <span className="truncate">{isAr ? 'مسح' : 'Scanner'}</span>
-                          </button>
-                          <input
-                            ref={el => { docCameraRefs.current[docDef.key] = el; }}
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            className="hidden"
-                            onChange={e => {
-                              const f = e.target.files?.[0];
-                              if (f) handleScanSpecificDoc(docDef.key, f);
-                              e.target.value = '';
+                            onClick={() => {
+                              setTextModalConfig({
+                                isOpen: true,
+                                docKey: docDef.key,
+                                titleFr: docDef.nameFr,
+                                titleAr: docDef.nameAr,
+                                initialReferenceNumber: scan?.referenceNumber,
+                                initialIssueDate: scan?.issueDate,
+                                initialNotes: scan?.notes,
+                              });
                             }}
-                          />
+                            className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs text-center truncate ${
+                              scan?.referenceNumber || scan?.notes
+                                ? 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+                                : 'bg-white text-slate-700 border border-slate-300 hover:bg-amber-50 hover:text-amber-800'
+                            }`}
+                            title={isAr ? 'كتابة نص توضيحي أو إدخال رقم تسجيل وتاريخ الوثيقة' : 'Saisir du texte, un numéro de référence ou une date de délivrance'}
+                          >
+                            <PenLine className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span className="truncate">
+                              {scan?.referenceNumber || scan?.notes
+                                ? (isAr ? 'تعديل النص' : 'Réf / Texte')
+                                : (isAr ? 'نص / مرجع' : 'Texte / Réf')}
+                            </span>
+                          </button>
+
+                          {/* 4. 📥 Télécharger le modèle officiel Word (.doc) */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              downloadOfficialModelWord(
+                                docDef.key, 
+                                docDef.nameFr, 
+                                docDef.nameAr, 
+                                { 
+                                  lastNameFr, 
+                                  firstNameFr, 
+                                  lastNameAr, 
+                                  firstNameAr, 
+                                  birthDate, 
+                                  birthPlace, 
+                                  nationalIdNumber, 
+                                  council, 
+                                  listRank, 
+                                  profession 
+                                }
+                              );
+                            }}
+                            className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-50 text-slate-700 border border-slate-300 hover:bg-slate-100 transition-all cursor-pointer shadow-2xs text-center truncate"
+                            title={isAr ? 'تحميل نموذج رسمي فارغ بصيغة Word' : 'Télécharger le modèle officiel Word (.doc) pré-rempli'}
+                          >
+                            <Download className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                            <span className="truncate">{isAr ? 'نموذج' : 'Modèle'}</span>
+                          </button>
                         </div>
                       </div>
 
-                      {/* Attached File Card Banner (if a file is uploaded or scanned) */}
+                      {/* 1. Attached File Card Banner (Photo or PDF or Word) */}
                       {scan?.fileDataUrl && (
                         <div className="mt-2.5 pt-2 border-t border-emerald-200/70 flex items-center justify-between gap-2 bg-emerald-100/50 p-2 rounded-lg text-xs">
                           <div className="flex items-center gap-2 min-w-0">
@@ -1955,16 +3055,28 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
                               </span>
                             ) : isPdf ? (
                               <span className="px-1.5 py-0.5 rounded bg-rose-700 text-white text-[10px] font-extrabold flex items-center gap-1 shrink-0">
+                                <FileText className="w-3 h-3" />
                                 PDF
                               </span>
                             ) : (
-                              <img
-                                src={scan.fileDataUrl}
-                                alt="Aperçu"
-                                className="w-6 h-6 rounded object-cover border border-emerald-500 shrink-0 cursor-pointer"
-                                onClick={() => window.open(scan.fileDataUrl, '_blank')}
-                                title="Agrandir"
-                              />
+                              <div 
+                                className="relative group cursor-pointer shrink-0"
+                                onClick={() => setPreviewModal({
+                                  dataUrl: scan.fileDataUrl!,
+                                  title: `${docDef.nameFr} (${docDef.nameAr})`,
+                                  fileName: scan.fileName,
+                                })}
+                                title={isAr ? 'اضغط لتكبير الصورة' : 'Cliquer pour agrandir la photo'}
+                              >
+                                <img
+                                  src={scan.fileDataUrl}
+                                  alt="Aperçu document"
+                                  className="w-8 h-8 rounded-md object-cover border border-emerald-500 hover:opacity-90 shadow-2xs"
+                                />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 rounded-md flex items-center justify-center transition-opacity">
+                                  <Maximize2 className="w-3 h-3 text-white" />
+                                </div>
+                              </div>
                             )}
 
                             <div className="min-w-0">
@@ -1972,7 +3084,8 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
                                 {scan.fileName || 'document_joint'}
                               </span>
                               <span className="text-[10px] text-emerald-800">
-                                {formatFileSize(scan.fileSize)} • {isAr ? 'تم الإرفاق بنجاح' : 'Joint au dossier'}
+                                {formatFileSize(scan.fileSize)} • {isAr ? 'ملف مرفق بالملف' : 'Fichier joint'}
+                                {scan.scannedAt && ` (${new Date(scan.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}
                               </span>
                             </div>
                           </div>
@@ -1980,17 +3093,75 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
                           <div className="flex items-center gap-1 shrink-0">
                             <button
                               type="button"
-                              onClick={() => downloadDocumentFile(scan.fileDataUrl!, scan.fileName || `${docDef.key}.doc`)}
+                              onClick={() => downloadDocumentFile(scan.fileDataUrl!, scan.fileName || `${docDef.key}.file`)}
                               className="p-1 rounded text-emerald-800 hover:text-emerald-950 hover:bg-emerald-200 transition-colors"
-                              title="Télécharger"
+                              title={isAr ? 'تحميل الملف' : 'Télécharger'}
                             >
                               <Download className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleRemoveFileForDoc(docDef.key)}
+                              onClick={() => handleRemoveFileOnly(docDef.key)}
                               className="p-1 rounded text-rose-600 hover:text-rose-800 hover:bg-rose-100 transition-colors"
-                              title="Supprimer la pièce jointe"
+                              title={isAr ? 'حذف هذا الملف فقط' : 'Supprimer ce fichier uniquement'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. Textual Reference & Notes Banner */}
+                      {(scan?.referenceNumber || scan?.notes || scan?.issueDate) && (
+                        <div className="mt-2 pt-1.5 border-t border-amber-200/60 flex items-start justify-between gap-2 bg-amber-50/80 p-2 rounded-lg text-xs">
+                          <div className="flex items-start gap-2 min-w-0">
+                            <FileSignature className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <div className="min-w-0 text-[11px] space-y-0.5">
+                              {scan.referenceNumber && (
+                                <div className="font-bold text-amber-950 flex items-center gap-1">
+                                  <span>{isAr ? 'الرقم المرجعي:' : 'Réf / N° :'}</span>
+                                  <span className="font-mono bg-white px-1.5 py-0.2 rounded border border-amber-300">
+                                    {scan.referenceNumber}
+                                  </span>
+                                </div>
+                              )}
+                              {scan.issueDate && (
+                                <div className="text-amber-900 text-[10px]">
+                                  {isAr ? 'تاريخ الإصدار: ' : 'Délivré le : '}{scan.issueDate}
+                                </div>
+                              )}
+                              {scan.notes && (
+                                <p className="text-amber-900/90 text-[10px] italic leading-tight">
+                                  "{scan.notes}"
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTextModalConfig({
+                                  isOpen: true,
+                                  docKey: docDef.key,
+                                  titleFr: docDef.nameFr,
+                                  titleAr: docDef.nameAr,
+                                  initialReferenceNumber: scan.referenceNumber,
+                                  initialIssueDate: scan.issueDate,
+                                  initialNotes: scan.notes,
+                                });
+                              }}
+                              className="p-1 rounded text-amber-800 hover:text-amber-950 hover:bg-amber-200 transition-colors"
+                              title={isAr ? 'تعديل البيانات النصية' : 'Modifier les mentions textuelles'}
+                            >
+                              <PenLine className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTextNote(docDef.key)}
+                              className="p-1 rounded text-rose-600 hover:text-rose-800 hover:bg-rose-100 transition-colors"
+                              title={isAr ? 'حذف هذا البيان النصي' : 'Supprimer cette mention'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -2078,6 +3249,92 @@ export const CandidateFormModal: React.FC<CandidateFormModalProps> = ({
         </div>
 
       </div>
+
+      {/* Live Camera Photo Capture Modal */}
+      <CameraCaptureModal
+        isOpen={cameraModalConfig.isOpen}
+        onClose={() => setCameraModalConfig(prev => ({ ...prev, isOpen: false }))}
+        onCapture={handleCameraCapture}
+        titleFr={cameraModalConfig.titleFr}
+        titleAr={cameraModalConfig.titleAr}
+        documentKey={cameraModalConfig.docKey}
+        defaultFacingMode={cameraModalConfig.defaultFacingMode}
+        isPortrait={cameraModalConfig.isPortrait}
+        language={language}
+      />
+
+      {/* Manual Document Text / References Modal */}
+      <DocumentTextModal
+        isOpen={textModalConfig.isOpen}
+        onClose={() => setTextModalConfig(prev => ({ ...prev, isOpen: false }))}
+        onSave={(k, data) => handleSaveDocumentText(k, data)}
+        docKey={textModalConfig.docKey}
+        titleFr={textModalConfig.titleFr}
+        titleAr={textModalConfig.titleAr}
+        initialReferenceNumber={textModalConfig.initialReferenceNumber}
+        initialIssueDate={textModalConfig.initialIssueDate}
+        initialNotes={textModalConfig.initialNotes}
+        language={language}
+      />
+
+      {/* Image Fullscreen Preview Modal */}
+      {previewModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setPreviewModal(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-700"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div className="min-w-0">
+                <h4 className="text-sm font-bold truncate">{previewModal.title}</h4>
+                {previewModal.fileName && (
+                  <span className="text-xs text-slate-400 truncate block font-mono">
+                    {previewModal.fileName}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => downloadDocumentFile(previewModal.dataUrl, previewModal.fileName || 'document.jpg')}
+                  className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  title="Télécharger l'image"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewModal(null)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-slate-950 p-4 flex items-center justify-center overflow-auto">
+              <img
+                src={previewModal.dataUrl}
+                alt="Aperçu document"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg border border-slate-800 shadow-lg"
+              />
+            </div>
+            <div className="p-3 bg-slate-900 text-slate-400 text-xs flex items-center justify-between">
+              <span>{isAr ? 'معاينة الصورة عالية الجودة' : 'Aperçu haute résolution'}</span>
+              <button
+                type="button"
+                onClick={() => setPreviewModal(null)}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+              >
+                {isAr ? 'إغلاق' : 'Fermer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
